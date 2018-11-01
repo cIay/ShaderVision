@@ -1,0 +1,61 @@
+#options-page {
+  position: absolute;
+  z-index: 1;
+  display: none;
+  width: 60%;
+  height: 60%;
+  top: 15px;
+  left: 27px;
+  background-color: white;
+  box-shadow: 0 0 3px 1px white;
+}
+
+#options-close {
+  float: right;
+}
+
+#options-surroundings {
+  position: absolute;
+  z-index: 1;
+  display: none;
+  height: 100%;
+  width: 288px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 40%);
+}
+
+.options-section-header {
+  font-size: 11px;
+  border-bottom: 1px solid black;
+  cursor: default;
+  background-color: lightgrey;
+}
+
+.options-row {
+  overflow: hidden;
+}
+
+.options-label {
+  font-size: 9px;
+  cursor: default;
+}
+
+.options-input {
+  font-size: 9px;
+  margin: 1px 1px 0 0;
+  float: right;
+}
+
+#options-footer {
+  position: absolute;
+  width: 100%;
+  bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#options-save {
+  font-size: 11px;
+  margin-right: 16px;
+}
