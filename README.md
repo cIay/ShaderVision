@@ -29,6 +29,6 @@ A Chrome extension that lets you write fragment shaders and apply them to videos
 
 ## Miscellaneous Info
 - Files can be added in two ways: by opening the editor (via the 'New file' and 'Edit' buttons) and saving with Ctrl-S, or by saving your file directly to the 'glsl' directory in your ShaderBliss folder.
-- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss popup.
+- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss popup page.
 - You may experience performance issues if the dimensions of your target video/image are too large.
 - Useful links: [The Book of Shaders](https://thebookofshaders.com/), [Shadertoy](https://www.shadertoy.com/), [GLSL Sandbox](http://glslsandbox.com/)
