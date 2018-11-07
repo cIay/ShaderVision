@@ -1,5 +1,5 @@
 # ![icon48](https://user-images.githubusercontent.com/10470041/48099653-87f80300-e1dd-11e8-8ef1-68d44ba24f8b.png) ShaderBliss
-A Chrome extension that lets you write fragment shaders and apply them to videos and images on the web.
+ShaderBliss is a Chrome extension that lets you write fragment shaders and apply them to videos and images on the web.
 
 ## Installation
 [Download ZIP](https://github.com/cIay/ShaderBliss/archive/master.zip) & extract, then:
