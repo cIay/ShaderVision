@@ -126,12 +126,15 @@ function main() {
 function execShaders(gl, settings, elements, audio, recorder) {
   console.log("ShaderBliss: Executing");
 
-  const programInfo = initPrograms(gl);
-  if (programInfo === null) {
+  function endProgram() {
     fragShaders = null;
     showMedia(elements);
     hideCanvas(elements);
     console.log("ShaderBliss: Dead");
+  }
+  const programInfo = initPrograms(gl);
+  if (programInfo === null) {
+    endProgram();
     return;
   }
 
@@ -175,7 +178,11 @@ function execShaders(gl, settings, elements, audio, recorder) {
 
     updateAudio(gl, freqTexture, timeTexture, audio);
 
-    updateTexture(gl, texture, elements.media);
+    if (!updateTexture(gl, texture, elements.media)) {
+      chrome.runtime.sendMessage({tabUrl: elements.media.src});
+      endProgram();
+      return;
+    }
     
     const uniforms = {
       time: time,
@@ -251,10 +258,17 @@ function updateTexture(gl, texture, media) {
   const srcType = gl.UNSIGNED_BYTE;
   gl.bindTexture(gl.TEXTURE_2D, texture);
   if (media.nodeName == 'VIDEO' && media.readyState < 3) {
-    return;
+    return true;
   }
-  gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-                srcFormat, srcType, media);
+  try {
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                  srcFormat, srcType, media);
+  }
+  catch (err) {
+    console.log("ShaderBliss: " + err);
+    return false;
+  }
+  return true;
 }
 
 function updateAudio(gl, freqTexture, timeTexture, audio) {
