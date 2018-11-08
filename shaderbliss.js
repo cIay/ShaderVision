@@ -179,7 +179,9 @@ function execShaders(gl, settings, elements, audio, recorder) {
     updateAudio(gl, freqTexture, timeTexture, audio);
 
     if (!updateTexture(gl, texture, elements.media)) {
-      chrome.runtime.sendMessage({tabUrl: elements.media.src});
+      if (elements.media.currentSrc) {
+        chrome.runtime.sendMessage({tabUrl: elements.media.currentSrc});
+      }
       endProgram();
       return;
     }
