@@ -3,7 +3,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 
 ## Installation
 [Download ZIP](https://github.com/cIay/ShaderBliss/archive/master.zip) & extract, then:
-> Customize and control Google Chrome -> More tools -> Extensions -> Load unpacked
+> Customize and control Google Chrome -> More tools -> Extensions -> Load unpacked (Developer mode must be on)
 
 ## Hotkeys
 #### Popup
