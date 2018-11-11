@@ -7,13 +7,6 @@ let flags = {
 let state = {
   audioSource: null, // 'video', 'mic', 'none'
   mediaType: null // 'video', 'image'
-  /*
-  uniformFlags: {
-    fft: true,
-    time: true,
-    energy: true
-  }
-  */
 }
 
 if (document.readyState == 'loading') {
@@ -81,9 +74,6 @@ function main() {
     }
     /*
     else if (e.key == 'p') {
-      console.log(elements.media);
-      //console.log(elements.video.readyState);
-      //resetPage(elements, oldAttributes);   
     }
     */
   });
@@ -173,8 +163,12 @@ function execShaders(gl, settings, elements, audio, recorder) {
       flags.resetAudio = false;
     }
 
-    let energy = audio.smoothEnergy(energyArray, prevEnergy);
-    prevEnergy = energy;
+    let energy = audio.calcEnergy();
+    audio.pushEnergy(energyArray, energy);
+    let avgEnergy = audio.averageEnergy(energyArray, energy);
+    //let energyVariance = audio.calcVariance(energyArray, avgEnergy);
+    let smoothedEnergy = audio.smoothEnergy(energyArray, prevEnergy);
+    prevEnergy = smoothedEnergy;
 
     updateAudio(gl, freqTexture, timeTexture, audio);
 
@@ -189,7 +183,8 @@ function execShaders(gl, settings, elements, audio, recorder) {
     const uniforms = {
       time: time,
       deltaTime: deltaTime,
-      energy: energy
+      energy: smoothedEnergy,
+      avgEnergy: avgEnergy
     };
     drawScene(gl, programInfo, buffer, pingPongData, uniforms);
 
@@ -310,16 +305,17 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
 
   function bindAndDraw(programIndex, fbo) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
     gl.uniform1i(programInfo[programIndex].uniformLocations.texture, 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
-    //if (state.audioSource) {
-      gl.uniform1i(programInfo[programIndex].uniformLocations.freqData, 1);
-      gl.uniform1i(programInfo[programIndex].uniformLocations.timeData, 2);
-      gl.uniform1f(programInfo[programIndex].uniformLocations.energy, uniforms.energy);
-    //}
+    gl.uniform1i(programInfo[programIndex].uniformLocations.freqData, 1);
+    gl.uniform1i(programInfo[programIndex].uniformLocations.timeData, 2);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.energy, uniforms.energy);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.avgEnergy, uniforms.avgEnergy);
     gl.uniform1f(programInfo[programIndex].uniformLocations.time, uniforms.time);
     gl.uniform1f(programInfo[programIndex].uniformLocations.deltaTime, uniforms.deltaTime);
+
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);  
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
@@ -367,7 +363,6 @@ function initPrograms(gl) {
 
   if (fragShaders.length == 0) {
     return null;
-    //fragShaders.push(fsSource);
   }
 
   const shaderPrograms = [];
@@ -388,6 +383,7 @@ function initPrograms(gl) {
         freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
         timeData: gl.getUniformLocation(shaderPrograms[i], 'timeData'),
         energy: gl.getUniformLocation(shaderPrograms[i], 'energy'),
+        avgEnergy: gl.getUniformLocation(shaderPrograms[i], 'avgEnergy'),
         time: gl.getUniformLocation(shaderPrograms[i], 'time'),
         deltaTime: gl.getUniformLocation(shaderPrograms[i], 'deltaTime')
       }
@@ -442,8 +438,6 @@ function loadShader(gl, type, source) {
 /* Canvas injection & formatting */
 
 function setDimensions(elements) {
-  const canvasScaling = 1.0;
-
   let mediaWidth, mediaHeight;
   if (state.mediaType == 'video') {
     mediaWidth = elements.media.videoWidth;
@@ -454,25 +448,15 @@ function setDimensions(elements) {
     mediaHeight = elements.media.height;  
   }
 
-  //console.log("mediaWidth: " + mediaWidth);
-  //console.log("mediaHeight: " + mediaHeight);
-
-
   if (elements.canvas.width != mediaWidth || elements.canvas.height != mediaHeight) {
     flags.resetFBO = true;
   }
   
-  elements.canvas.width = mediaWidth * canvasScaling;
-  elements.canvas.height = mediaHeight * canvasScaling;
-  //const ratio = elements.video.videoWidth / elements.video.videoHeight;
+  elements.canvas.width = mediaWidth;
+  elements.canvas.height = mediaHeight;
+
   elements.canvas.style.width = elements.media.clientWidth + "px";
   elements.canvas.style.height = elements.media.clientHeight + "px";
-  /*
-  console.log("canvas width: " + elements.canvas.width);
-  console.log("canvas height: " + elements.canvas.height);
-  console.log("canvas style width: " + elements.canvas.style.width);
-  console.log("canvas style height: " + elements.canvas.style.height);
-  */
 }
 
 function showCanvas(elements) {
@@ -494,8 +478,6 @@ function showMedia(elements) {
 }
 
 function hideMedia(elements) {
-  ////if (elements.video.parentElement.nodeName == 'BODY')
-  ////elements.video.style.display = 'none';
   if (state.mediaType == 'video') {
     if (!elements.video.controls) {
       elements.media.style.visibility = 'hidden';
@@ -529,8 +511,6 @@ function initCanvas(elements) {
   elements.canvas.style.display = 'block';
   elements.canvas.style.visibility = 'hidden';
   elements.canvas.style.objectFit = 'contain'
-  ////elements.canvas.className = elements.video.className;
-  ////elements.canvas.style.cssText = window.getComputedStyle(elements.video).cssText;
   elements.canvas.style.position = 'absolute';
   setDimensions(elements);
   reStyle(elements);
@@ -546,8 +526,6 @@ function initResizeObserver(resizeObserver, elements) {
   }
 
   let handleResize = function(entry) {
-    //console.log("resize!");
-    //console.log(entry);
     setDimensions(elements);
   };
 
@@ -571,26 +549,21 @@ function initAttributeObserver(attributeObserver, elements) {
   let handleMutation = function(mutation) {
     // video style change.. make sure it is still hidden
     if (mutation.type == 'attributes' && mutation.attributeName == 'style') {
-      //console.log('style!');
       attributeObserver.disconnect();
       hideMedia(elements);
       attributeObserver.observe(elements.video, {attributes: true});
     }
     // video source change, so ensure correct dimensions
     if (mutation.type == 'attributes' && mutation.attributeName == 'src') {
-      //console.log('src!');
       if (elements.video.readyState == 0) {
-        //console.log("HAVE NOTHING");
         attributeObserver.disconnect();
         elements.video.addEventListener('loadedmetadata', (e) => {
-          //console.log('loadedmetadata');
           setDimensions(elements);
           e.target.removeEventListener(e.type, arguments.callee);
         });
         attributeObserver.observe(elements.video, {attributes: true});
       }
       else {
-        //console.log('HAVE METADATA');
         setDimensions(elements);
       }
     }
@@ -601,7 +574,7 @@ function initAttributeObserver(attributeObserver, elements) {
       mutationsList.forEach(handleMutation);
     }
   });
-  attributeObserver.observe(elements.video, {attributes: true}); ////attributeOldValue: true
+  attributeObserver.observe(elements.video, {attributes: true});
 
   return attributeObserver;
 }
@@ -669,7 +642,7 @@ function Recorder(canvas) {
   };
 
   this.setStream = (audioStream) => {
-    this.stream = canvas.captureStream(60); // fps
+    this.stream = canvas.captureStream(60); // max fps
     if (audioStream) {
       let track = audioStream.getAudioTracks()[0];
       this.stream.addTrack(track);
@@ -746,22 +719,35 @@ function AudioProcessor() {
 
   this.analyser = this.context.createAnalyser();
   
+  this.streamSource = null;
+  this.elementSource = null;
+
   this.setBuffers = (fftSize, smoothingFactor) => {
     this.analyser.fftSize = fftSize;
     this.analyser.smoothingTimeConstant = smoothingFactor;
     this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
     this.timeDomainData = new Uint8Array(this.analyser.frequencyBinCount);
 
-    this.energyBuf = new Float32Array(128);
+    this.energyBuf = new Float32Array(this.analyser.fftSize);
     this.energySmoothingFactor = 1.0 - smoothingFactor;
-    this.energySmoothingMemory = 12;
+    this.energyMemory = Math.ceil(this.context.sampleRate / this.analyser.fftSize);
+    //console.log("energyMemory: " + this.energyMemory);
+    //console.log("sampleRate: " + this.context.sampleRate);
   }
 
   this.connectSource = (mediaSource) => {
+    this.analyser.disconnect();
+    if (this.source) {
+      this.source.disconnect();
+    }
     this.source = mediaSource;
+
     if (mediaSource.mediaStream) {
+      if (this.elementSource) {
+        this.elementSource.connect(this.context.destination);
+      }
       this.source.connect(this.analyser);
-      this.stream = mediaSource.mediaStream;
+      this.stream = this.source.mediaStream;
     }
     else if (mediaSource.mediaElement) {
       this.source.connect(this.analyser);
@@ -772,31 +758,44 @@ function AudioProcessor() {
     }
   };
 
-  this.smoothEnergy = (energyArray, prevEnergy) => {
-    let energy = calcEnergy();
+  this.calcEnergy = () => {
+    this.analyser.getFloatTimeDomainData(this.energyBuf);
+    return this.energyBuf.reduce(function(acc, val) {
+      let amp = Math.abs(val);
+      return acc + amp*amp;
+    }) / this.energyBuf.length;
+  };
 
-    if (energyArray.length == this.energySmoothingMemory) {
+  this.pushEnergy = (energyArray, energy) => {
+    if (energyArray.length == this.energyMemory) {
       energyArray.shift();
     }
     energyArray.push(energy);
+  };
 
+  this.averageEnergy = (energyArray, energy) => {
+    return energyArray.reduce(function(acc, val) {
+      return acc + val;
+    }) / energyArray.length;
+  };
+
+  this.smoothEnergy = (energyArray, prevEnergy) => {
+    let smoothingFactor = this.energySmoothingFactor; 
     let cur, prev = prevEnergy;
     for (let i = 0; i < energyArray.length; i++) {
-      cur = this.energySmoothingFactor*energyArray[i] + (1.0-this.energySmoothingFactor)*prev;
+      cur = smoothingFactor*energyArray[i] + (1.0 - smoothingFactor)*prev;
       prev = cur;
     }
-
     return cur;
   };
 
-  let calcEnergy = () => {
-    this.analyser.getFloatTimeDomainData(this.energyBuf);
-    let e = this.energyBuf.reduce(function(acc, val) {
-      let amp = Math.abs(val);
-      return acc + amp*amp;
-    });
-    return e / this.energyBuf.length;
+  /*
+  this.calcVariance = (energyArray, avgEnergy) => {
+    return energyArray.reduce(function(acc, val) {
+      return acc + Math.pow(val - avgEnergy, 2);
+    }) / energyArray.length;
   };
+  */
 }
 
 
@@ -813,15 +812,17 @@ function initMediaStream(elements, audio, recorder) {
     //console.log(navigator.mediaDevices.getSupportedConstraints());
     navigator.mediaDevices.getUserMedia({audio: contraints}).then((stream) => {
       try {
-        audio.connectSource(audio.context.createMediaStreamSource(stream));
+        audio.streamSource = audio.context.createMediaStreamSource(stream);
       } catch {}
+      audio.connectSource(audio.streamSource);
       recorder.setStream(audio.stream);
     });
   }
   else if (state.audioSource == 'video' && state.mediaType == 'video') {
     try {
-      audio.connectSource(audio.context.createMediaElementSource(elements.video));
+      audio.elementSource = audio.context.createMediaElementSource(elements.video);
     } catch {}
+    audio.connectSource(audio.elementSource);
     recorder.setStream(audio.stream);
   }
   else {

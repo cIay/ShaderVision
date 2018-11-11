@@ -3,14 +3,23 @@ precision mediump float;
 uniform vec2 resolution;
 uniform sampler2D texture;
 uniform float energy;
+uniform float avgEnergy;
 
 #define PI 3.14159265359
+
+bool beat(float e, float E, float C) { return e > E*C; }
 
 void main(void) {
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 
-	float aberrationFactor = energy * 100.0;
-
+	float aberrationFactor = 0.0;
+	if (beat(energy, avgEnergy, 1.3)) {
+		aberrationFactor = energy * 100.0;
+	}
+	else {
+		aberrationFactor = energy * 10.0;
+	}
+	
 	float xTrans = uv.x*2.0 - 1.0;
 	float yTrans = 1.0 - uv.y*2.0;
 
