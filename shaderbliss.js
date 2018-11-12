@@ -58,24 +58,22 @@ function main() {
 
   initObservers(observers, elements);
 
-  document.addEventListener('keypress', (e) => {
-    if (e.key == 'r') {
-      if (fragShaders) {
-        recorder.toggleRecording();
+  document.addEventListener('keydown', (e) => {
+    if (e.altKey) {
+      if (e.key == 'r') {
+        if (fragShaders) {
+          recorder.toggleRecording();
+        }
+      }
+      else if (e.key == 's') {
+        if (fragShaders) {
+          recorder.takeScreenshot();
+        }
+      }
+      else if (e.key == 'x') {
+        chrome.runtime.sendMessage({requestShaders: true});
       }
     }
-    else if (e.key == 's') {
-      if (fragShaders) {
-        recorder.takeScreenshot();
-      }
-    }
-    else if (e.key == 'x') {
-      chrome.runtime.sendMessage({requestShaders: true});
-    }
-    /*
-    else if (e.key == 'p') {
-    }
-    */
   });
 
   chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
@@ -716,9 +714,14 @@ function Recorder(canvas) {
 function AudioProcessor() {
 
   this.context = new AudioContext();
-
   this.analyser = this.context.createAnalyser();
-  
+  /*
+  this.filter = this.context.createBiquadFilter();
+  this.filter.type = 'allpass';
+  //this.filter.frequency.value = 1000; //10 hz to Nyquist, default 350 hz
+  //this.filter.gain.value = 40; //-40 dB to 40 dB, default 0 dB
+  //this.filter.Q.value = 500; //0.0001 to 1000, default 1
+  */
   this.streamSource = null;
   this.elementSource = null;
 
@@ -741,6 +744,7 @@ function AudioProcessor() {
       this.source.disconnect();
     }
     this.source = mediaSource;
+    //this.source.connect(this.filter);
 
     if (mediaSource.mediaStream) {
       if (this.elementSource) {
@@ -751,6 +755,7 @@ function AudioProcessor() {
     }
     else if (mediaSource.mediaElement) {
       this.source.connect(this.analyser);
+      //this.filter.connect(this.analyser);
       this.analyser.connect(this.context.destination);
       let dest = this.context.createMediaStreamDestination();
       this.source.connect(dest);

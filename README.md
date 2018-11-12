@@ -14,9 +14,9 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 * __Ctrl-S__: Save
 
 #### Target page
-* __R__: Start/stop recording
-* __S__: Take screenshot
-* __X__: Execute selected shaders
+* __Alt-R__: Start/stop recording
+* __Alt-S__: Take screenshot
+* __Alt-X__: Execute selected shaders
 
 ## Screenshots
 ![screen1](https://user-images.githubusercontent.com/10470041/48097232-81b25880-e1d6-11e8-93a7-c66b6002a94e.PNG)
