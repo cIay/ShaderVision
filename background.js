@@ -62,7 +62,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 function storeShader(name, contents, sendResponse) {
   chrome.storage.local.get(['savedShaders'], function(result) {
-    // if file does not yet exist and isn't a banned name, or it does and isn't read-only
+    // if file does not yet exist and isn't a banned name, or it does exist and isn't read-only
     if ((!result.savedShaders[name] && storageKeys.indexOf(name) == -1) || 
         (result.savedShaders[name] && !result.savedShaders[name].inFileSystem)) {
 
@@ -143,22 +143,24 @@ function sendShaders(targetTab, targetScript, fileList) {
     query.push('savedShaders');
   }
 
-  chrome.storage.local.get(query, function(result) {
-    if (noActiveShaders) {
-      //TODO: write getNewFilename() which appends an incrementing number to the 'New Shader' name
-      chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
-      return;
-    }
-
-    fileList.forEach(function(name) {
-      // check if the file exists
-      if (result.savedShaders[name]) {
-        shaderObj.names.push(name);
-        shaderObj.contents.push(result[name].text);
-        shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
+  readRemLoad(function() {
+    chrome.storage.local.get(query, function(result) {
+      if (noActiveShaders) {
+        //TODO: write getNewFilename() which appends an incrementing number to the 'New Shader' name
+        chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
+        return;
       }
+
+      fileList.forEach(function(name) {
+        // check if the file exists
+        if (result.savedShaders[name]) {
+          shaderObj.names.push(name);
+          shaderObj.contents.push(result[name].text);
+          shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
+        }
+      });
+      chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
     });
-    chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
   });
 }
 
@@ -182,4 +184,103 @@ function styleChain(cssFiles, callback) {
     };
   });
   chain();
+}
+
+
+
+function readRemLoad(callback) {
+  readDirectory('glsl', function(entries) {
+    removeFiles(entries, function(entries, savedShaders, dropped) {
+      loadFiles(entries, savedShaders, dropped, callback);
+    });
+  });
+}
+
+function readDirectory(directory, callback) {
+  chrome.runtime.getPackageDirectoryEntry(function(directoryEntry) {
+    directoryEntry.getDirectory(directory, {}, function(subDirectoryEntry) {
+      const directoryReader = subDirectoryEntry.createReader();
+      directoryReader.readEntries(function(entries) {
+        callback(entries);
+      });
+    });
+  });
+}
+
+function removeFiles(entries, callback) {
+  chrome.storage.local.get(['savedShaders'], function(result) {
+    //console.log(result);
+
+    let markedForRemoval = [];
+    let savedShaders = {}
+    if (result.savedShaders) {
+      savedShaders = result.savedShaders;
+      for (let key in savedShaders) {
+        if (savedShaders[key].inFileSystem) {
+          markedForRemoval.push(key);
+          delete savedShaders[key];
+        }
+      }
+    }
+
+    chrome.storage.local.set({savedShaders: savedShaders}, function() {
+      chrome.storage.local.remove(markedForRemoval, function () {
+        callback(entries, savedShaders, false);
+      });
+    });
+  });
+}
+
+
+function loadFiles(entries, savedShaders, dropped, callback) {
+
+  const loadedShaders = {};
+  let i = 0;
+  (function readNext(i) {
+
+    function readFile(shaderFile) {
+      const fileReader = new FileReader();
+
+      fileReader.addEventListener('loadend', function(e) {
+        if ((dropped && savedShaders[shaderFile.name] && savedShaders[shaderFile.name].inFileSystem) ||
+            (storageKeys.indexOf(shaderFile.name) != -1)) {
+          // file was dropped and it exists in the filesystem, or the name is banned, so skip
+        }
+        else {
+          loadedShaders[shaderFile.name] = {
+            text: fileReader.result
+          };
+          savedShaders[shaderFile.name] = {
+            inFileSystem: !dropped
+          };
+          loadedShaders['savedShaders'] = savedShaders;
+        }
+
+        determineContinue();
+      });
+
+      fileReader.readAsText(shaderFile);
+    };
+
+    function determineContinue() {
+      if (i < entries.length-1) {
+        readNext(++i);
+      }
+      else if (i == entries.length-1) {
+        chrome.storage.local.set(loadedShaders, callback);
+      }
+    }
+
+    if (!dropped && entries[i].isFile) {
+      entries[i].file(function(shaderFile) {
+        readFile(shaderFile);
+      });
+    }
+    else if (dropped && entries[i].type.slice(0, 4) == "text") {
+      readFile(entries[i]);
+    }
+    else {
+      determineContinue();
+    }
+  })(i);
 }

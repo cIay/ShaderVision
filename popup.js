@@ -92,95 +92,6 @@ function refreshShaderList() {
   });
 }
 
-function readDirectory(directory, callback) {
-  chrome.runtime.getPackageDirectoryEntry(function(directoryEntry) {
-    directoryEntry.getDirectory(directory, {}, function(subDirectoryEntry) {
-      const directoryReader = subDirectoryEntry.createReader();
-      directoryReader.readEntries(function(entries) {
-        callback(entries, loadFiles);
-      });
-    });
-  });
-}
-
-function loadFiles(entries, savedShaders, dropped) {
-
-  const loadedShaders = {};
-  let i = 0;
-  (function readNext(i) {
-
-    function readFile(shaderFile) {
-      const fileReader = new FileReader();
-
-      fileReader.addEventListener('loadend', function(e) {
-        if ((dropped && savedShaders[shaderFile.name] && savedShaders[shaderFile.name].inFileSystem) ||
-            (storageKeys.indexOf(shaderFile.name) != -1)) {
-          // file was dropped and it exists in the filesystem, or the name is banned, so skip
-        }
-        else {
-          loadedShaders[shaderFile.name] = {
-            text: fileReader.result
-          };
-          savedShaders[shaderFile.name] = {
-            inFileSystem: !dropped
-          };
-          loadedShaders['savedShaders'] = savedShaders;
-        }
-
-        determineContinue();
-      });
-
-      fileReader.readAsText(shaderFile);
-    };
-
-    function determineContinue() {
-      if (i < entries.length-1) {
-        readNext(++i);
-      }
-      else if (i == entries.length-1) {
-        chrome.storage.local.set(loadedShaders, function() {
-          refreshShaderList();
-        });
-      }
-    }
-
-    if (!dropped && entries[i].isFile) {
-      entries[i].file(function(shaderFile) {
-        readFile(shaderFile);
-      });
-    }
-    else if (dropped && entries[i].type.slice(0, 4) == "text") {
-      readFile(entries[i]);
-    }
-    else {
-      determineContinue();
-    }
-  })(i);
-}
-
-function removeFiles(entries, callback) {
-  chrome.storage.local.get(null, function(result) {
-    //console.log(result);
-
-    let markedForRemoval = [];
-    let savedShaders = {}
-    if (result.savedShaders) {
-      savedShaders = result.savedShaders;
-      for (let key in savedShaders) {
-        if (savedShaders[key].inFileSystem) {
-          markedForRemoval.push(key);
-          delete savedShaders[key];
-        }
-      }
-    }
-
-    chrome.storage.local.set({savedShaders: savedShaders}, function() {
-      chrome.storage.local.remove(markedForRemoval, function () {
-        callback(entries, savedShaders, false);
-      });
-    });
-  });
-}
 
 
 function animateElement(element, time, animation) {
@@ -363,8 +274,12 @@ $("#active-shaders").sortable({
 
 $("#table-container").disableSelection();
 
-readDirectory('glsl', removeFiles);
 
+chrome.runtime.getBackgroundPage(function(bg) {
+  bg.readRemLoad(function() {
+    refreshShaderList();
+  });
+});
 
 
 
@@ -395,7 +310,9 @@ $("#saved-shaders").on("drop", function(e) {
   const files = e.originalEvent.dataTransfer.files;
 
   chrome.storage.local.get(['savedShaders'], function(result) {
-    loadFiles(files, result.savedShaders, true);
+    chrome.runtime.getBackgroundPage(function(bg) {
+      bg.loadFiles(files, result.savedShaders, true);
+    });
   });
 });
 
