@@ -16,6 +16,17 @@ else {
   main();
 }
 
+/*
+function attachPlayListeners(videos, elements) {
+  for (let i = 0; i < videos.length; i++) {
+    videos[i].addEventListener('play', function() {
+      state.mediatype = 'video';
+      elements.video = videos[i];
+      elements.media = elements.video;
+    });
+  }
+}
+*/
 
 function main() {
   const elements = {
@@ -28,6 +39,7 @@ function main() {
   if (elements.video) {
     state.mediaType = 'video';
     elements.media = elements.video;
+    //attachPlayListeners(document.getElementsByTagName('video'), elements);
   }
   else if (elements.image) {
     state.mediaType = 'image';
@@ -36,12 +48,6 @@ function main() {
 
   //console.log("video source: " + elements.video.src);
   //console.log("video readyState: " + elements.video.readyState);
-
-  const observers = {
-    resizeObserver: null,
-    attributeObserver: null,
-    childObserver: null
-  }
 
   initCanvas(elements);
 
@@ -56,6 +62,12 @@ function main() {
   let recorder = new Recorder(elements.canvas);
   let audio = new AudioProcessor();
 
+
+  const observers = {
+    resizeObserver: null,
+    attributeObserver: null,
+    childObserver: null
+  }
   initObservers(observers, elements);
 
   document.addEventListener('keydown', (e) => {
@@ -126,6 +138,9 @@ function execShaders(gl, settings, elements, audio, recorder) {
     return;
   }
 
+  let mouseCoords = {x: 0.0, y: 0.0};
+  initMouseListener(elements, mouseCoords);
+
   const buffer = initBuffer(gl);
   const texture = initTexture(gl);
   const freqTexture = initTexture(gl); 
@@ -181,6 +196,7 @@ function execShaders(gl, settings, elements, audio, recorder) {
     const uniforms = {
       time: time,
       deltaTime: deltaTime,
+      mouse: mouseCoords,
       energy: smoothedEnergy,
       avgEnergy: avgEnergy
     };
@@ -307,6 +323,8 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
     gl.uniform1i(programInfo[programIndex].uniformLocations.texture, 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
+    gl.uniform2f(programInfo[programIndex].uniformLocations.mouse, 
+                 uniforms.mouse.x, uniforms.mouse.y);
     gl.uniform1i(programInfo[programIndex].uniformLocations.freqData, 1);
     gl.uniform1i(programInfo[programIndex].uniformLocations.timeData, 2);
     gl.uniform1f(programInfo[programIndex].uniformLocations.energy, uniforms.energy);
@@ -378,6 +396,7 @@ function initPrograms(gl) {
       uniformLocations: {
         texture: gl.getUniformLocation(shaderPrograms[i], 'texture'),
         resolution: gl.getUniformLocation(shaderPrograms[i], 'resolution'),
+        mouse: gl.getUniformLocation(shaderPrograms[i], 'mouse'),
         freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
         timeData: gl.getUniformLocation(shaderPrograms[i], 'timeData'),
         energy: gl.getUniformLocation(shaderPrograms[i], 'energy'),
@@ -839,4 +858,22 @@ function applySettings(settings, audio, recorder) {
   state.audioSource = settings.audioSource;
   recorder.setOptions(settings.videoBitrate, settings.audioBitrate);
   audio.setBuffers(settings.fftSize, settings.smoothingFactor);
+}
+
+
+function initMouseListener(elements, mouseCoords) {
+
+  function setMouseCoords(elements, mouseCoords, clientX, clientY) {
+    let rect = elements.canvas.getBoundingClientRect();
+    mouseCoords.x = (clientX - rect.left) / elements.canvas.clientWidth;
+    mouseCoords.y = (elements.canvas.clientHeight - (clientY - rect.top)) / elements.canvas.clientHeight;
+  }
+
+  elements.media.addEventListener('mousemove', function(e) {
+    setMouseCoords(elements, mouseCoords, e.clientX, e.clientY);
+  });
+
+  elements.canvas.addEventListener('mousemove', function(e) {
+    setMouseCoords(elements, mouseCoords, e.clientX, e.clientY);
+  });
 }
