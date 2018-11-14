@@ -1,8 +1,3 @@
-const storageKeys = [
-  'settings', 
-  'activeShaders', 
-  'savedShaders'
-];
 //document.getElementById("icon").addEventListener('click', function() {
 //});
 
@@ -28,7 +23,7 @@ function createShaderList(id) {
   const shaderList = [];
   const shaderElements = document.getElementById(id);
   for (let i = 0; i < shaderElements.children.length; i++) {
-    shaderList.push(shaderElements.children[i].innerText);
+    shaderList.push(shaderElements.children[i].innerText.slice(0, -1));
   }
   return shaderList;
 }
@@ -48,7 +43,7 @@ function addShader(shaders, sibling, name, inFileSystem, appendButtons) {
     newShader.classList.add("ui-sortable-handle");
   }
 
-  if (sibling){
+  if (sibling) {
     sibling.insertAdjacentElement('afterend', newShader);
   }
   else {
