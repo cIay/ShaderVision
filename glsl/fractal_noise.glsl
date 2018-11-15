@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
 uniform float time;
 
 vec3 permute(vec3 x) {
@@ -68,7 +68,7 @@ vec3 pattern(vec2 p, float t, float luminance) {
 
 void main(void) {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
-  vec4 c = texture2D(texture, uv);
+  vec4 c = texture2D(frame, uv);
 
   gl_FragColor = vec4((pattern(uv, time*0.0001, (c.r + c.g + c.b) / 3.0)), 1.0);
 }

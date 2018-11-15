@@ -95,6 +95,7 @@ function main() {
       }
 
       else if (request.shaders && request.settings) {
+        console.log(request.shaders);
         applySettings(request.settings, audio, recorder);
         initMediaStream(elements, audio, recorder);
 
@@ -124,7 +125,7 @@ function main() {
 
 
 function execShaders(gl, settings, elements, audio, recorder) {
-  console.log("ShaderBliss: Executing");
+  console.log("ShaderBliss: Running...");
 
   function endProgram() {
     fragShaders = null;
@@ -320,7 +321,7 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
   function bindAndDraw(programIndex, fbo) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    gl.uniform1i(programInfo[programIndex].uniformLocations.texture, 0);
+    gl.uniform1i(programInfo[programIndex].uniformLocations.frame, 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
     gl.uniform2f(programInfo[programIndex].uniformLocations.mouse, 
@@ -368,18 +369,14 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
 }
 
 function initPrograms(gl) {
-  // Vertex shader program
-  const vsSource = `
-    attribute vec4 aVertexPosition;
-
-    void main(void) {
-      gl_Position = aVertexPosition;
-    }
-  `;
 
   if (fragShaders.length == 0) {
     return null;
   }
+
+  let parser = new Parser();
+  // Vertex shader program
+  const vsSource = parser.getSource(fragShaders[0]);
 
   const shaderPrograms = [];
   const programInfo = [];
@@ -394,7 +391,7 @@ function initPrograms(gl) {
         vertexPosition: gl.getAttribLocation(shaderPrograms[i], 'aVertexPosition')
       },
       uniformLocations: {
-        texture: gl.getUniformLocation(shaderPrograms[i], 'texture'),
+        frame: gl.getUniformLocation(shaderPrograms[i], 'frame'),
         resolution: gl.getUniformLocation(shaderPrograms[i], 'resolution'),
         mouse: gl.getUniformLocation(shaderPrograms[i], 'mouse'),
         freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
@@ -641,7 +638,32 @@ function initObservers(observers, elements) {
 
 
 
+function Parser() {
+// Public:
+  this.getSource = (shader) => {
+    if (getVersion(shader) == "#version 300 es") {
+      return `#version 300 es
+        in vec4 aVertexPosition;
+        void main(void) {
+          gl_Position = aVertexPosition;
+        }
+      `;
+    }
+    else {
+      return `
+        attribute vec4 aVertexPosition;
+        void main(void) {
+          gl_Position = aVertexPosition;
+        }
+      `;
+    }
+  }
 
+// Private:
+  let getVersion = (shader) => {
+    return shader.split(/\r?\n/)[0];
+  }; 
+}
 
 
 function Recorder(canvas) {

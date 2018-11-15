@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
 uniform float energy;
 
 #define PI 3.14159265359
@@ -33,9 +33,9 @@ void main(void) {
 	bCoords.x = (radii.b * cos(angle) + 1.0) / 2.0;
 	bCoords.y = -(radii.b * sin(angle) - 1.0) / 2.0;
 
-	float red = texture2D(texture, rCoords).r;
-	float green = texture2D(texture, gCoords).g;
-	float blue = texture2D(texture, bCoords).b;
+	float red = texture2D(frame, rCoords).r;
+	float green = texture2D(frame, gCoords).g;
+	float blue = texture2D(frame, bCoords).b;
 
 	gl_FragColor = vec4(red, green, blue, 1.0);
 }

@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
 uniform float time;
 
 float EffectDuration = 1.0;
@@ -38,7 +38,7 @@ vec3 GetTextureOffset(vec2 coords, vec2 textureSize, vec2 texelOffset) {
 	vec2 halfTexelSize = texelSize / 2.0;
 	vec2 clampedOffsetCoords = clamp(offsetCoords, halfTexelSize, 1.0 - halfTexelSize);
 	
-	return texture2D(texture, clampedOffsetCoords).rgb;
+	return texture2D(frame, clampedOffsetCoords).rgb;
 }
 
 void main(void) {
@@ -54,5 +54,4 @@ void main(void) {
 	
 
 	gl_FragColor = vec4(background, 1.0);
-
 }

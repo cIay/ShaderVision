@@ -1,11 +1,11 @@
 precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
 
 void main(void) {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
-  highp vec4 c = texture2D(texture, uv);
+  highp vec4 c = texture2D(frame, uv);
 
   float luminance = (c.r + c.g + c.b) / 3.0; 
   float saturation = (abs(c.r - luminance) + abs(c.g - luminance) + abs(c.b - luminance)) / 3.0 * (1.0 - luminance);

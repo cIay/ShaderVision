@@ -1,7 +1,7 @@
 precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
 uniform float energy;
 uniform float avgEnergy;
 
@@ -14,7 +14,7 @@ void main(void) {
 
 	float aberrationFactor = 0.0;
 	if (beat(energy, avgEnergy, 1.3)) {
-		aberrationFactor = energy * 100.0;
+		aberrationFactor = energy * 40.0;
 	}
 	else {
 		aberrationFactor = energy * 10.0;
@@ -42,9 +42,9 @@ void main(void) {
 	bCoords.x = (radii.b * cos(angle) + 1.0) / 2.0;
 	bCoords.y = -(radii.b * sin(angle) - 1.0) / 2.0;
 
-	float red = texture2D(texture, rCoords).r;
-	float green = texture2D(texture, gCoords).g;
-	float blue = texture2D(texture, bCoords).b;
+	float red = texture2D(frame, rCoords).r;
+	float green = texture2D(frame, gCoords).g;
+	float blue = texture2D(frame, bCoords).b;
 
 	gl_FragColor = vec4(red, green, blue, 1.0);
 }
