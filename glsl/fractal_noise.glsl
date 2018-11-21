@@ -1,4 +1,7 @@
+#version 300 es
+
 precision mediump float;
+out vec4 fragColor;
 
 uniform vec2 resolution;
 uniform sampler2D frame;
@@ -60,7 +63,7 @@ float fbm(vec2 st) {
 
 vec3 pattern(vec2 p, float t, float luminance) {
   vec2 q = vec2(fbm(p + vec2(0.0, 0.0)), fbm(p*sin(t + luminance)  + vec2(5.2, 1.3)));
-  vec2 r = vec2(fbm(p + 4.0*q + vec2(1.7,9.2)), fbm(p + 4.0*q*sin(t + luminance) + vec2(8.3,2.8)));
+  vec2 r = vec2(fbm(p + 4.0*q + vec2(1.7,9.2)), fbm(p + 4.0*q*cos(t + luminance) + vec2(8.3,2.8)));
   float f = fbm(p + 4.0*r);
   vec3 p_out = vec3((r.x*r.y), (mix(q.y,r.y,f)), r.y);
   return p_out;
@@ -68,7 +71,7 @@ vec3 pattern(vec2 p, float t, float luminance) {
 
 void main(void) {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
-  vec4 c = texture2D(frame, uv);
+  vec4 c = texture(frame, uv);
 
-  gl_FragColor = vec4((pattern(uv, time*0.0001, (c.r + c.g + c.b) / 3.0)), 1.0);
+  fragColor = vec4((pattern(uv, time*0.05, (c.r + c.g + c.b) / 3.0)), 1.0);
 }

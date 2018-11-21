@@ -1,9 +1,14 @@
+#version 300 es
+
 precision mediump float;
+out vec4 fragColor;
 
 uniform vec2 resolution;
 uniform sampler2D frame;
-uniform float energy;
-uniform float avgEnergy;
+uniform float bass;
+uniform float avgBass;
+uniform float treb;
+uniform float avgTreb;
 
 #define PI 3.14159265359
 
@@ -12,14 +17,14 @@ bool beat(float e, float E, float C) { return e > E*C; }
 void main(void) {
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 
-	float aberrationFactor = 0.0;
-	if (beat(energy, avgEnergy, 1.3)) {
-		aberrationFactor = energy * 40.0;
+	float aberrationFactor;;
+	if (beat(bass, avgBass, 1.3)) {
+		aberrationFactor = bass * 50.0;
 	}
 	else {
-		aberrationFactor = energy * 10.0;
+		aberrationFactor = bass * 20.0;
 	}
-	
+
 	float xTrans = uv.x*2.0 - 1.0;
 	float yTrans = 1.0 - uv.y*2.0;
 
@@ -42,9 +47,9 @@ void main(void) {
 	bCoords.x = (radii.b * cos(angle) + 1.0) / 2.0;
 	bCoords.y = -(radii.b * sin(angle) - 1.0) / 2.0;
 
-	float red = texture2D(frame, rCoords).r;
-	float green = texture2D(frame, gCoords).g;
-	float blue = texture2D(frame, bCoords).b;
+	float red = texture(frame, rCoords).r;
+	float green = texture(frame, gCoords).g;
+	float blue = texture(frame, bCoords).b;
 
-	gl_FragColor = vec4(red, green, blue, 1.0);
+	fragColor = vec4(red, green, blue, 1.0);
 }

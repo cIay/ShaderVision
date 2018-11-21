@@ -99,7 +99,6 @@ function main() {
       }
 
       else if (request.shaders && request.settings) {
-        console.log(request.shaders);
         applySettings(request.settings, audio, recorder);
         initMediaStream(elements, audio, recorder);
 
@@ -154,12 +153,10 @@ function execShaders(gl, settings, elements, audio, recorder) {
   flags.resetFBO = false;
 
   let prevTime = 0.0;
-  let prevEnergy = 0.0;
-  let energyArray = [];
 
   // Draw the scene repeatedly
   function render(time) {
-    //time *= 0.001;  // convert to seconds
+    time *= 0.001;  // convert to seconds
     const deltaTime = time - prevTime;
     prevTime = time;
 
@@ -181,14 +178,12 @@ function execShaders(gl, settings, elements, audio, recorder) {
       flags.resetAudio = false;
     }
 
-    let energy = audio.calcEnergy();
-    audio.pushEnergy(energyArray, energy);
-    let avgEnergy = audio.averageEnergy(energyArray, energy);
-    //let energyVariance = audio.calcVariance(energyArray, avgEnergy);
-    let smoothedEnergy = audio.smoothEnergy(energyArray, prevEnergy);
-    prevEnergy = smoothedEnergy;
-
     updateAudio(gl, freqTexture, timeTexture, audio);
+    const low = audio.sumSubBand(0, 300);
+    const mid = audio.sumSubBand(300, 4000);
+    const high = audio.sumSubBand(4000, (audio.context.sampleRate / 2));
+    const total = audio.sumSubBand(0, (audio.context.sampleRate / 2));
+    audio.pushAllEnergy(low, mid, high, total);
 
     if (!updateTexture(gl, texture, elements.media)) {
       if (elements.media.currentSrc) {
@@ -199,11 +194,17 @@ function execShaders(gl, settings, elements, audio, recorder) {
     }
     
     const uniforms = {
-      time: time,
-      deltaTime: deltaTime,
       mouse: mouseCoords,
-      energy: smoothedEnergy,
-      avgEnergy: avgEnergy
+      bass: low,
+      avgBass: audio.averageEnergyHistory(audio.lowHistory),
+      mid: mid,
+      avgMid: audio.averageEnergyHistory(audio.midHistory),
+      treb: high,
+      avgTreb: audio.averageEnergyHistory(audio.highHistory),
+      energy: total,
+      avgEnergy: audio.averageEnergyHistory(audio.totalHistory),
+      time: time,
+      deltaTime: deltaTime
     };
     drawScene(gl, programInfo, buffer, pingPongData, uniforms);
 
@@ -281,7 +282,7 @@ function updateTexture(gl, texture, media) {
                   srcFormat, srcType, media);
   }
   catch (err) {
-    console.log("ShaderBliss: " + err);
+    console.log(err);
     return false;
   }
   return true;
@@ -291,10 +292,12 @@ function updateAudio(gl, freqTexture, timeTexture, audio) {
   if (state.audioSource == 'video' || state.audioSource == 'mic') {
     audio.analyser.getByteFrequencyData(audio.frequencyData);
     audio.analyser.getByteTimeDomainData(audio.timeDomainData);
+    audio.instantAnalyser.getByteFrequencyData(audio.instantFrequencyData);
   }
   else {
     audio.frequencyData.fill(0);
     audio.timeDomainData.fill(0);
+    audio.instantFrequencyData.fill(0);
   }
 
   gl.activeTexture(gl.TEXTURE1);
@@ -332,6 +335,12 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
                  uniforms.mouse.x, uniforms.mouse.y);
     gl.uniform1i(programInfo[programIndex].uniformLocations.freqData, 1);
     gl.uniform1i(programInfo[programIndex].uniformLocations.timeData, 2);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.bass, uniforms.bass);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.avgBass, uniforms.avgBass);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.mid, uniforms.mid);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.avgMid, uniforms.avgMid);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.treb, uniforms.treb);
+    gl.uniform1f(programInfo[programIndex].uniformLocations.avgTreb, uniforms.avgTreb);
     gl.uniform1f(programInfo[programIndex].uniformLocations.energy, uniforms.energy);
     gl.uniform1f(programInfo[programIndex].uniformLocations.avgEnergy, uniforms.avgEnergy);
     gl.uniform1f(programInfo[programIndex].uniformLocations.time, uniforms.time);
@@ -400,6 +409,12 @@ function initPrograms(gl) {
         mouse: gl.getUniformLocation(shaderPrograms[i], 'mouse'),
         freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
         timeData: gl.getUniformLocation(shaderPrograms[i], 'timeData'),
+        bass: gl.getUniformLocation(shaderPrograms[i], 'bass'),
+        avgBass: gl.getUniformLocation(shaderPrograms[i], 'avgBass'),
+        mid: gl.getUniformLocation(shaderPrograms[i], 'mid'),
+        avgMid: gl.getUniformLocation(shaderPrograms[i], 'avgMid'),
+        treb: gl.getUniformLocation(shaderPrograms[i], 'treb'),
+        avgTreb: gl.getUniformLocation(shaderPrograms[i], 'avgTreb'),
         energy: gl.getUniformLocation(shaderPrograms[i], 'energy'),
         avgEnergy: gl.getUniformLocation(shaderPrograms[i], 'avgEnergy'),
         time: gl.getUniformLocation(shaderPrograms[i], 'time'),
@@ -609,7 +624,6 @@ function initChildObserver(childObserver, elements) {
       for (let node of mutation.addedNodes) {
         // switch to the new video
         if (node.nodeName == 'VIDEO') {
-          //console.log('new video...');
           elements.video = node;
           flags.resetAudio = true;
           resizeObserver.disconnect();
@@ -757,9 +771,10 @@ function Recorder(canvas) {
 
 
 function AudioProcessor() {
-
+// Public:
   this.context = new AudioContext();
   this.analyser = this.context.createAnalyser();
+  this.instantAnalyser = this.context.createAnalyser();
   /*
   this.filter = this.context.createBiquadFilter();
   this.filter.type = 'allpass';
@@ -774,13 +789,14 @@ function AudioProcessor() {
     this.analyser.fftSize = fftSize;
     this.analyser.smoothingTimeConstant = smoothingFactor;
     this.frequencyData = new Uint8Array(this.analyser.frequencyBinCount);
-    this.timeDomainData = new Uint8Array(this.analyser.frequencyBinCount);
+    this.timeDomainData = new Uint8Array(this.analyser.fftSize);
 
-    this.energyBuf = new Float32Array(this.analyser.fftSize);
-    this.energySmoothingFactor = 1.0 - smoothingFactor;
-    this.energyMemory = Math.ceil(this.context.sampleRate / this.analyser.fftSize);
-    //console.log("energyMemory: " + this.energyMemory);
-    //console.log("sampleRate: " + this.context.sampleRate);
+    this.instantAnalyser.fftSize = fftSize;
+    this.instantAnalyser.smoothingTimeConstant = 0;
+    this.instantFrequencyData = new Uint8Array(this.instantAnalyser.frequencyBinCount);
+
+    this.lowHistory = [], this.midHistory = [], this.highHistory = [], this.totalHistory = [];
+    this.historyLen = Math.ceil(this.context.sampleRate / this.instantAnalyser.fftSize);
   }
 
   this.connectSource = (mediaSource) => {
@@ -796,10 +812,12 @@ function AudioProcessor() {
         this.elementSource.connect(this.context.destination);
       }
       this.source.connect(this.analyser);
+      this.source.connect(this.instantAnalyser);
       this.stream = this.source.mediaStream;
     }
     else if (mediaSource.mediaElement) {
       this.source.connect(this.analyser);
+      this.source.connect(this.instantAnalyser);
       //this.filter.connect(this.analyser);
       this.analyser.connect(this.context.destination);
       let dest = this.context.createMediaStreamDestination();
@@ -808,44 +826,52 @@ function AudioProcessor() {
     }
   };
 
-  this.calcEnergy = () => {
-    this.analyser.getFloatTimeDomainData(this.energyBuf);
-    return this.energyBuf.reduce(function(acc, val) {
-      let amp = Math.abs(val);
-      return acc + amp*amp;
-    }) / this.energyBuf.length;
-  };
-
-  this.pushEnergy = (energyArray, energy) => {
-    if (energyArray.length == this.energyMemory) {
-      energyArray.shift();
+  this.pushAllEnergy = (low, mid, high, total) => {
+    function pushEnergy(history, energy) {
+      if (history.length == this.historyLen) {
+        history.shift();
+      }
+      history.push(energy);
     }
-    energyArray.push(energy);
+    pushEnergy(this.lowHistory, low);
+    pushEnergy(this.midHistory, mid);
+    pushEnergy(this.highHistory, high);
+    pushEnergy(this.totalHistory, total);
   };
 
-  this.averageEnergy = (energyArray, energy) => {
-    return energyArray.reduce(function(acc, val) {
+  this.averageEnergyHistory = (history) => {
+    return history.reduce(function(acc, val) {
       return acc + val;
-    }) / energyArray.length;
+    }, 0) / history.length;
   };
 
-  this.smoothEnergy = (energyArray, prevEnergy) => {
-    let smoothingFactor = this.energySmoothingFactor; 
-    let cur, prev = prevEnergy;
-    for (let i = 0; i < energyArray.length; i++) {
-      cur = smoothingFactor*energyArray[i] + (1.0 - smoothingFactor)*prev;
-      prev = cur;
+  this.sumSubBand = (minFreq, maxFreq) => {
+    if (minFreq > maxFreq) {
+      let temp = minFreq;
+      minFreq = maxFreq;
+      maxFreq = temp;
     }
-    return cur;
+
+    let acc = 0; //, count = 0;
+    for (let i = getFreqIndex(minFreq); i <= getFreqIndex(maxFreq); i++) {
+      let mag = reverseDBConversion(this.frequencyData[i]);
+      acc += mag*mag;
+      //count += 1;
+    }
+    return acc; /// count;
   };
 
-  /*
-  this.calcVariance = (energyArray, avgEnergy) => {
-    return energyArray.reduce(function(acc, val) {
-      return acc + Math.pow(val - avgEnergy, 2);
-    }) / energyArray.length;
+//Private:
+  let getFreqIndex = (freq) => {
+    return Math.floor(
+      (freq / (this.context.sampleRate / 2)) * (this.frequencyData.length - 1)
+    );
   };
-  */
+  
+  let reverseDBConversion = (dB) => {
+    let range = this.analyser.maxDecibels - this.analyser.minDecibels;
+    return Math.pow(10, (dB/255*range + this.analyser.minDecibels) / 20);
+  };
 }
 
 

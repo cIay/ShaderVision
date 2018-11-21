@@ -1,4 +1,7 @@
+#version 300 es
+
 precision mediump float;
+out vec4 fragColor;
 
 uniform vec2 resolution;
 uniform sampler2D frame;
@@ -33,9 +36,9 @@ void main(void) {
 	bCoords.x = (radii.b * cos(angle) + 1.0) / 2.0;
 	bCoords.y = -(radii.b * sin(angle) - 1.0) / 2.0;
 
-	float red = texture2D(frame, rCoords).r;
-	float green = texture2D(frame, gCoords).g;
-	float blue = texture2D(frame, bCoords).b;
+	float red = texture(frame, rCoords).r;
+	float green = texture(frame, gCoords).g;
+	float blue = texture(frame, bCoords).b;
 
-	gl_FragColor = vec4(red, green, blue, 1.0);
+	fragColor = vec4(red, green, blue, 1.0);
 }

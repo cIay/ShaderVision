@@ -1,11 +1,14 @@
+#version 300 es
+
 precision mediump float;
+out vec4 fragColor;
 
 uniform vec2 resolution;
 uniform sampler2D frame;
 
 void main(void) {
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
-	vec4 c = texture2D(frame, uv);
+	vec4 c = texture(frame, uv);
 
-	gl_FragColor = vec4((vec3(1.0) - c.rgb), 1.0);
+	fragColor = vec4((vec3(1.0) - c.rgb), 1.0);
 }
