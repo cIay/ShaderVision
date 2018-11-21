@@ -32,4 +32,4 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 - Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss popup page.
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
 - You may experience performance issues if the dimensions of your target video/image are too large.
-- Useful links: [The Book of Shaders](https://thebookofshaders.com/), [Shadertoy](https://www.shadertoy.com/), [GLSL Sandbox](http://glslsandbox.com/)
+- Useful links: [The Book of Shaders](https://thebookofshaders.com/), [Shadertoy](https://www.shadertoy.com/), [GLSL Sandbox](http://glslsandbox.com/), [iq's website](http://www.iquilezles.org/www/index.htm)
