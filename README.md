@@ -6,7 +6,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 > Customize and control Google Chrome -> More tools -> Extensions -> Load unpacked (Developer mode must be on)
 
 ## Hotkeys
-#### Popup
+#### Dropdown
 * __Alt-S__: Save settings
 * __Alt-X__: Execute selected shaders
 
@@ -28,8 +28,11 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 ![screen4](https://user-images.githubusercontent.com/10470041/48097235-824aef00-e1d6-11e8-9664-b8178fde6a7a.PNG)
 
 ## Miscellaneous Info
-- Files can be added in two ways: by opening the editor (via the 'New file' and 'Edit' buttons) and saving with Ctrl-S, or by saving your file directly to the 'glsl' directory in your ShaderBliss folder.
-- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss popup page.
+- Files can be added in one of three ways: 
+  1. By opening the editor (via the 'New file' or 'Edit' button) and saving with Ctrl-S 
+  2. By saving your file directly to the 'glsl' directory in your ShaderBliss folder
+  3. By dropping a text file into the shader-list area within the main dropdown page
+- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss dropdown page.
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
 - You may experience performance issues if the dimensions of your target video/image are too large.
 - Useful links: [The Book of Shaders](https://thebookofshaders.com/), [Shadertoy](https://www.shadertoy.com/), [GLSL Sandbox](http://glslsandbox.com/), [iq's website](http://www.iquilezles.org/www/index.htm)
