@@ -216,6 +216,7 @@ function updateAnimation(item) {
 
 
 $("#saved-shaders-wrapper").resizable({
+  zIndex: "auto",
   handles: "s",
   minHeight: 40,
   maxHeight: $("#table-container").height() - 40,
@@ -250,7 +251,7 @@ $("#active-shaders").sortable({
   },
   out: function(e, ui) {
     // if dragging
-    if (ui.helper && $("#active-shaders")[0].children.length <= 2) {
+    if (ui.helper && $(ui.item).hasClass("ui-draggable-handle") && $("#active-shaders")[0].children.length <= 2) {
       addEmptyMessage($("#active-shaders")[0]);
     }
     $("#active-shaders").css("background-color", "");
