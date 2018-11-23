@@ -8,7 +8,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 ## Hotkeys
 #### Dropdown
 * __Alt-S__: Save settings
-* __Alt-X__: Execute selected shaders
+* __Alt-A__: Apply selected shaders
 
 #### Editor ([CodeMirror](https://codemirror.net/) defaults)
 * __Ctrl-S__: Save
@@ -16,7 +16,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 #### Target page
 * __Alt-R__: Start/stop recording
 * __Alt-S__: Take screenshot
-* __Alt-X__: Execute selected shaders
+* __Alt-A__: Apply selected shaders
 
 ## Uniforms
 ```glsl
