@@ -86,7 +86,7 @@ function main() {
           recorder.takeScreenshot();
         }
       }
-      else if (e.key == 'x') {
+      else if (e.key == 'a') {
         chrome.runtime.sendMessage({requestShaders: true});
       }
     }
@@ -522,6 +522,7 @@ function hideMedia(elements) {
 function reStyle(elements) {
   if (state.mediaType == 'video') {
     if (elements.video.controls) {
+      elements.canvas.style.position = 'absolute';
       elements.video.style.position = 'static';
       elements.video.parentNode.style.display = 'flex';
       elements.video.parentNode.style.alignItems = 'center';
@@ -529,6 +530,9 @@ function reStyle(elements) {
       elements.video.parentNode.style.height = '100vh';
       elements.video.parentNode.style.margin = '0';
     }
+  }
+  else {
+    elements.canvas.style.position = 'absolute';
   }
 }
 
@@ -541,8 +545,7 @@ function initCanvas(elements) {
   elements.canvas.style.margin = '0px auto';
   elements.canvas.style.display = 'block';
   elements.canvas.style.visibility = 'hidden';
-  elements.canvas.style.objectFit = 'contain'
-  elements.canvas.style.position = 'absolute';
+  elements.canvas.style.objectFit = 'contain';
   setDimensions(elements);
   reStyle(elements);
   elements.media.insertAdjacentElement('beforebegin', elements.canvas);
