@@ -23,6 +23,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 uniform vec2 resolution;     // intrinsic width and height of the WebGL canvas in pixels
 uniform sampler2D frame;     // active frame texture
 uniform float time;          // time since the shader began running in seconds
+uniform float deltaTime;     // time since the last draw in seconds
 uniform vec2 mouse;          // mouse location coordinates
 uniform sampler2D timeData;  // audio time domain samples
 uniform sampler2D freqData;  // audio frequency domain dB values
