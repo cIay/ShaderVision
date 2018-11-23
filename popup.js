@@ -272,9 +272,7 @@ $("#table-container").disableSelection();
 
 
 chrome.runtime.getBackgroundPage(function(bg) {
-  bg.readRemLoad(function() {
-    refreshShaderList();
-  });
+  bg.readRemLoad(refreshShaderList);
 });
 
 
@@ -305,11 +303,13 @@ $("#saved-shaders").on("drop", function(e) {
 
   const files = e.originalEvent.dataTransfer.files;
 
-  chrome.storage.local.get(['savedShaders'], function(result) {
-    chrome.runtime.getBackgroundPage(function(bg) {
-      bg.loadFiles(files, result.savedShaders, true);
+  if (files.length > 0) {
+    chrome.storage.local.get(['savedShaders'], function(result) {
+      chrome.runtime.getBackgroundPage(function(bg) {
+        bg.loadFiles(files, result.savedShaders, true, refreshShaderList);
+      });
     });
-  });
+  }
 });
 
 
