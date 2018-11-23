@@ -7,8 +7,6 @@ uniform vec2 resolution;
 uniform sampler2D frame;
 uniform float bass;
 uniform float avgBass;
-uniform float treb;
-uniform float avgTreb;
 
 #define PI 3.14159265359
 
