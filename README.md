@@ -30,9 +30,9 @@ uniform float bass;          // energy sum from 0 Hz - 300 Hz
 uniform float avgBass;       // average bass energy in the last second
 uniform float mid;           // energy sum from 300 Hz - 4000 Hz
 uniform float avgMid;        // average midrange energy in the last second
-uniform float treb;          // energy sum from 4000 Hz to Nyquist
+uniform float treb;          // energy sum from 4000 Hz - Nyquist
 uniform float avgTreb;       // average treble energy in the last second
-uniform float energy;        // energy sum from 0 Hz to Nyquist
+uniform float energy;        // energy sum from 0 Hz - Nyquist
 uniform float avgEnergy;     // average total energy in the last second
 ```
 
