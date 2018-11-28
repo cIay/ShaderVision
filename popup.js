@@ -28,6 +28,240 @@ function createShaderList(id) {
   return shaderList;
 }
 
+
+
+function SelectionHandler() {
+
+  function SelectedControls(parent) {
+
+    this.run = () => {
+
+    };
+
+    this.add = () => {
+      if (searchBar != document.activeElement && !settingsOpen() 
+          && prevSelected.selection && prevSelected.selection.isConnected) {
+        
+        if (prevSelected.status == 'active') {
+          cloneAction(prevSelected.selection);
+        }
+        else {
+          addAction(prevSelected.selection);
+        }
+      }
+    };
+
+    this.remove = () => {
+      if (searchBar != document.activeElement && !settingsOpen() 
+          && prevSelected.selection && prevSelected.selection.isConnected) {
+
+        if (prevSelected.selection.previousSibling) {
+          var sibling = prevSelected.selection.previousSibling;
+        }
+        else {
+          var sibling = prevSelected.selection.nextSibling;
+        }
+
+        if (prevSelected.status == 'active') {
+          removeAction(prevSelected.selection);
+        }
+        else {
+          deleteAction(prevSelected.selection);
+        }
+
+        parent.highlight(sibling);
+      }
+    };
+
+    this.swapUp = () => {
+      if (searchBar != document.activeElement && !settingsOpen() 
+          && prevSelected.selection && prevSelected.selection.isConnected) {
+
+        const sibling = prevSelected.selection.previousSibling;
+        if (prevSelected.status == 'active' && sibling) {
+          sibling.parentNode.insertBefore(prevSelected.selection, sibling);
+          prevSelected.selection.scrollIntoView({block: 'nearest'});
+        }
+      }
+    };
+
+    this.swapDown = () => {
+      if (searchBar != document.activeElement && !settingsOpen() 
+          && prevSelected.selection && prevSelected.selection.isConnected) {
+
+        const sibling = prevSelected.selection.nextSibling;
+        if (prevSelected.status == 'active' && sibling) {
+          sibling.parentNode.insertBefore(sibling, prevSelected.selection);
+          prevSelected.selection.scrollIntoView({block: 'nearest'});
+        }
+      }
+    };
+  }
+
+  this.selectedControls = new SelectedControls(this);
+
+  const prevSelected = {
+    status: 'active',
+    selection: null,
+    savedSelection: null,
+    activeSelection: null
+  }
+
+  const searchBar = document.getElementById("search-bar");
+  searchBar.addEventListener('focus', () => {
+    this.highlight(null);
+    prevSelected.status = 'active';
+  });
+  document.getElementById("exec").addEventListener('focus', (e) => {
+    e.currentTarget.blur();
+  });
+  const savedShaders = document.getElementById("saved-shaders").children;
+  const activeShaders = document.getElementById("active-shaders").children;
+
+  function settingsOpen() {
+    return document.getElementById("options-page").style.display == 'block';
+  }
+
+  this.switch = () => {
+    if (!settingsOpen()) {
+      if (prevSelected.status == 'active') {
+        if (!prevSelected.savedSelection || (prevSelected.savedSelection 
+            && (!prevSelected.savedSelection.isConnected || prevSelected.savedSelection.style.display == 'none'))) {
+          prevSelected.savedSelection = savedShaders[0];
+        }
+        if (prevSelected.savedSelection && prevSelected.savedSelection.isConnected) {
+          this.highlight(prevSelected.savedSelection, 'saved');
+        }
+      }
+      else {
+        if (!prevSelected.activeSelection || (prevSelected.activeSelection 
+            && (!prevSelected.activeSelection.isConnected || prevSelected.activeSelection.style.display == 'none'))) {
+          prevSelected.activeSelection = activeShaders[0];
+        }
+        if (prevSelected.activeSelection && prevSelected.activeSelection.isConnected) {
+          this.highlight(prevSelected.activeSelection, 'active');
+        }
+      }
+    }
+  };
+
+  this.moveUp = (e) => {
+    if (searchBar != document.activeElement && !settingsOpen()) {
+      e.preventDefault();
+      if (prevSelected.selection) {
+        var sibling = prevSelected.selection.previousSibling;
+      }
+      while (sibling && sibling.style.display == 'none') {
+        sibling = sibling.previousSibling;
+      }
+      if (sibling) {
+        sibling.scrollIntoView({block: 'nearest'});
+        this.highlight(sibling);
+      }
+    }
+  };
+
+  this.moveDown = (e) => {
+    if (searchBar != document.activeElement && !settingsOpen()) {
+      e.preventDefault();
+      if (prevSelected.selection) {
+        var sibling = prevSelected.selection.nextSibling;
+      }
+      else {
+        this.switch();
+        return;
+      }
+      while (sibling && sibling.style.display == 'none') {
+        sibling = sibling.nextSibling;
+      }
+      if (sibling) {
+        sibling.scrollIntoView({block: 'nearest'});
+        this.highlight(sibling);
+      }
+    }
+  };
+
+  this.highlight = (shader, type) => {
+    if (!type) {
+      type = prevSelected.status;
+    }
+
+    if (prevSelected.selection) {
+      prevSelected.selection.classList.remove("selected");
+    }
+
+    if (shader) {
+      shader.classList.add("selected");
+      prevSelected.selection = shader;
+      if (type == 'active') {
+        prevSelected.status = 'active';
+        prevSelected.activeSelection = shader;
+      }
+      else {
+        prevSelected.status = 'saved';
+        prevSelected.savedSelection = shader;
+      }
+    }
+    else {
+      prevSelected.selection = null;
+    }
+  };
+
+}
+
+let selectionHandler = new SelectionHandler();
+
+document.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'Tab':
+      selectionHandler.switch();
+      break;
+
+    case 'f':
+      if (e.ctrlKey) {
+        if (document.getElementById("options-page").style.display != 'block') {
+          document.getElementById("search-bar").focus();
+        }
+      }
+      break;
+
+    case 'ArrowUp':
+      if (e.ctrlKey && e.shiftKey) {
+        selectionHandler.selectedControls.swapUp();
+      }
+      else {
+        selectionHandler.moveUp(e);
+      }
+      break;
+
+    case 'ArrowDown':
+      if (e.ctrlKey && e.shiftKey) {
+        selectionHandler.selectedControls.swapDown();
+      }
+      else {
+        selectionHandler.moveDown(e);
+      }
+      break;
+
+    case 'Enter':
+      selectionHandler.selectedControls.add();
+      break;
+
+    case 'Backspace':
+      selectionHandler.selectedControls.remove();
+      break;
+
+    case 'Delete':
+      selectionHandler.selectedControls.remove();
+      break;
+
+    case ' ':
+      selectionHandler.selectedControls.run();
+      break;
+  }
+});
+
+
 function addShader(shaders, sibling, name, inFileSystem, appendButtons) {
 
   const newShader = document.createElement("div");
@@ -42,6 +276,10 @@ function addShader(shaders, sibling, name, inFileSystem, appendButtons) {
     remEmptyMessage(shaders);
     newShader.classList.add("ui-sortable-handle");
   }
+
+  newShader.addEventListener('mousedown', function() {
+    selectionHandler.highlight(newShader, shaders.id.split("-")[0]);
+  });
 
   if (sibling) {
     sibling.insertAdjacentElement('afterend', newShader);
@@ -122,24 +360,40 @@ $("#search-bar").on("input", function() {
 
 
 
+
 function appendButton(iconType, div, tooltip, onClick) {
   const button = document.createElement("span");
   button.classList.add("ui-icon");
   button.classList.add("ui-icon-" + iconType);
   button.classList.add("shader-icon");
   button.title = tooltip;
-  button.addEventListener('click', onClick);
+  button.addEventListener('click', function() {
+    onClick(div);
+  });
   button.addEventListener('click', function() {
     buttonAnimation(button);
   });
   div.appendChild(button);
 }
 
+function deleteAction(div) {
+  removeShader(div.firstChild.innerText);
+}
+
+function addAction(div) {
+  let newItem = addShader(document.getElementById("active-shaders"),
+                          null, 
+                          div.firstChild.innerText,
+                          null,
+                          appendActiveButtons);
+  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+  updateAnimation(newItem);
+  newItem.scrollIntoView(false);
+}
+
 function appendSavedButtons(div, inFileSystem) {
   if (!inFileSystem) {
-    appendButton("trash", div, "Delete", function() {
-      removeShader(div.firstChild.innerText);
-    });
+    appendButton("trash", div, "Delete", deleteAction);
   }
 
   appendButton("script", div, "Edit", function() {
@@ -148,36 +402,30 @@ function appendSavedButtons(div, inFileSystem) {
     });
   });
 
-  appendButton("circlesmall-plus", div, "Add", function() {
-    let newItem = addShader(document.getElementById("active-shaders"),
-                            null, 
-                            div.firstChild.innerText,
-                            null,
-                            appendActiveButtons);
-    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
-    updateAnimation(newItem);
-    newItem.scrollIntoView(false);
-  });
+  appendButton("circlesmall-plus", div, "Add", addAction);
+}
+
+function cloneAction(div) {
+  let clonedItem = addShader(document.getElementById("active-shaders"), 
+                             div,
+                             div.firstChild.innerText,
+                             null,
+                             appendActiveButtons);
+  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+  updateAnimation(clonedItem);
+}
+
+function removeAction(div) {
+  if (div.parentElement.children.length <= 1) {
+    addEmptyMessage(div.parentElement);
+  }
+  div.parentElement.removeChild(div);
+  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
 }
 
 function appendActiveButtons(div) {
-  appendButton("copy", div, "Clone", function() {
-    let clonedItem = addShader(document.getElementById("active-shaders"), 
-                               div,
-                               div.firstChild.innerText,
-                               null,
-                               appendActiveButtons);
-    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
-    updateAnimation(clonedItem);
-  });
-
-  appendButton("circlesmall-minus", div, "Remove", function() {
-    if (div.parentElement.children.length <= 1) {
-      addEmptyMessage(div.parentElement);
-    }
-    div.parentElement.removeChild(div);
-    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
-  });
+  appendButton("copy", div, "Clone", cloneAction);
+  appendButton("circlesmall-minus", div, "Remove", removeAction);
 }
 
 function buttonAnimation(item) {
@@ -235,6 +483,7 @@ function makeDraggable() {
     containment: "#table-container",
     start: function(e, ui) {
       $(ui.helper).children(".ui-icon").remove();
+      $(ui.helper).removeClass("selected");
     }
   });
 }
@@ -262,6 +511,9 @@ $("#active-shaders").sortable({
       $(ui.item).removeClass("ui-draggable-handle");      
       $(ui.item).addClass("ui-sortable-handle");
       appendActiveButtons(ui.item.context);
+      $(ui.item).mousedown(function() {
+        selectionHandler.highlight(ui.item.context, "active-shaders");
+      });
     }
     chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
     updateAnimation(ui.item.context);
