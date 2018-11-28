@@ -32,10 +32,16 @@ function createShaderList(id) {
 
 function SelectionHandler() {
 
-  function SelectedControls(parent) {
+  function SelectedControls(handler) {
 
     this.run = () => {
+      if (searchBar != document.activeElement && !settingsOpen() 
+          && prevSelected.selection && prevSelected.selection.isConnected) {
 
+        chrome.runtime.getBackgroundPage(function(bg) {
+          bg.applyShaders([prevSelected.selection.firstChild.innerText]);
+        });
+      }
     };
 
     this.add = () => {
@@ -69,7 +75,7 @@ function SelectionHandler() {
           deleteAction(prevSelected.selection);
         }
 
-        parent.highlight(sibling);
+        handler.highlight(sibling);
       }
     };
 

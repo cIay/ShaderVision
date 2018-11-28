@@ -86,19 +86,31 @@ function storeShader(name, contents, sendResponse) {
 }
 
 
-function applyShaders() {
+function applyShaders(shaders) {
   chrome.tabs.query({active:true, currentWindow: true}, function(tabs) {
     chrome.tabs.sendMessage(tabs[0].id, {target: 'canvas', ping: true}, function(response) {
-      chrome.storage.local.get(['activeShaders'], function(result) {
+      if (!shaders) {
+        chrome.storage.local.get(['activeShaders'], function(result) {
+          if (!response) {
+            executeChain(runScripts, function() {
+              sendShaders(tabs[0].id, 'canvas', result.activeShaders);
+            });
+          }
+          else if (response.pong) {
+            sendShaders(tabs[0].id, 'canvas', result.activeShaders);
+          }
+        });
+      }
+      else {
         if (!response) {
           executeChain(runScripts, function() {
-            sendShaders(tabs[0].id, 'canvas', result.activeShaders);
+            sendShaders(tabs[0].id, 'canvas', shaders);
           });
         }
         else if (response.pong) {
-          sendShaders(tabs[0].id, 'canvas', result.activeShaders);
+          sendShaders(tabs[0].id, 'canvas', shaders);
         }
-      });
+      }
     });
   });
 }
