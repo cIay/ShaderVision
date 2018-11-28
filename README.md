@@ -14,6 +14,7 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 * __Backspace or Delete__: Remove/delete selected shader
 * __Ctrl-Shift-Up__: Swap selected shader with the one above
 * __Ctrl-Shift-Down__: Swap selected shader with the one below
+* __Ctrl-F__: Focus on search bar
 
 #### Editor ([CodeMirror](https://codemirror.net/) defaults)
 * __Ctrl-S__: Save
