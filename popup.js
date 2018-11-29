@@ -72,7 +72,7 @@ function SelectionHandler() {
           removeAction(prevSelected.selection);
         }
         else {
-          deleteAction(prevSelected.selection);
+          //deleteAction(prevSelected.selection);
         }
 
         handler.highlight(sibling);
@@ -138,7 +138,6 @@ function SelectionHandler() {
       return null;
     }
     if (!settingsOpen()) {
-      console.log(prevSelected);
       if (prevSelected.status == 'active') {
         if (!prevSelected.savedSelection || (prevSelected.savedSelection 
             && (!prevSelected.savedSelection.isConnected || prevSelected.savedSelection.style.display == 'none'))) {
