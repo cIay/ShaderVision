@@ -29,9 +29,28 @@ function attachPlayListeners(videos, elements) {
 */
 
 function main() {
+
+  function getLargestElement(elementList) {
+    if (elementList[0]) {
+      var largestElement = elementList[0];
+      let dimensions = largestElement.width * largestElement.height;
+      for (let i = 1; i < elementList.length; i++) {
+        let curDimensions = elementList[i].width * elementList[i].height;
+        if (curDimensions > dimensions) {
+          largestElement = elementList[i];
+          dimensions = curDimensions;
+        }
+      }
+      return largestElement;
+    }
+    else {
+      return null;
+    }
+  }
+
   const elements = {
-    video: document.getElementsByTagName('video')[0],
-    image: document.getElementsByTagName('img')[0],
+    video: getLargestElement(document.getElementsByTagName('video')),
+    image: getLargestElement(document.getElementsByTagName('img')),
     media: null,
     canvas: null
   };
@@ -49,9 +68,6 @@ function main() {
   if ((new URL(elements.media.currentSrc)).origin != window.location.origin) {
     elements.media.crossOrigin = 'anonymous';
   }
-
-  //console.log("video source: " + elements.video.src);
-  //console.log("video readyState: " + elements.video.readyState);
 
   initCanvas(elements);
 
@@ -469,14 +485,13 @@ function loadShader(gl, type, source) {
 /* Canvas injection & formatting */
 
 function setDimensions(elements) {
-  let mediaWidth, mediaHeight;
   if (state.mediaType == 'video') {
-    mediaWidth = elements.media.videoWidth;
-    mediaHeight = elements.media.videoHeight;
+    var mediaWidth = elements.media.videoWidth;
+    var mediaHeight = elements.media.videoHeight;
   }
   else if (state.mediaType == 'image') {
-    mediaWidth = elements.media.width;
-    mediaHeight = elements.media.height;  
+    var mediaWidth = elements.media.width;
+    var mediaHeight = elements.media.height;  
   }
 
   if (elements.canvas.width != mediaWidth || elements.canvas.height != mediaHeight) {
