@@ -9,10 +9,10 @@ ShaderBliss is a Chrome extension that lets you write fragment shaders and apply
 #### Dropdown
 * __Alt-S__: Save settings
 * __Alt-A__: Apply all chosen shaders
-* __Space__: Apply the single selected shader
+* __Space__: Apply selected shader
 * __Tab__: Swap selection area
 * __Enter__: Add/clone selected shader
-* __Backspace or Delete__: Remove/delete selected shader
+* __Backspace or Delete__: Remove selected shader
 * __Ctrl-Shift-Up__: Swap selected shader with the one above
 * __Ctrl-Shift-Down__: Swap selected shader with the one below
 * __Ctrl-F__: Focus on search bar
@@ -55,11 +55,12 @@ uniform float avgEnergy;     // average total energy in the last second
 ![screen4](https://user-images.githubusercontent.com/10470041/48097235-824aef00-e1d6-11e8-9664-b8178fde6a7a.PNG)
 
 ## Miscellaneous Info
-- Files can be added in one of three ways: 
+- Files can be added in three different ways: 
   1. By opening the editor (via the 'New file' or 'Edit' button) and saving with Ctrl-S 
   2. By saving your file directly to the 'glsl' directory in your ShaderBliss folder
   3. By dropping a text file into the shader-list area within the main dropdown page
 - Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss dropdown page.
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
+- The target media item is the video with the largest dimensions. If no video is present then the largest image is chosen instead.
 - You may experience performance issues if the dimensions of your target video/image are too large.
 - Useful links: [The Book of Shaders](https://thebookofshaders.com/), [Shadertoy](https://www.shadertoy.com/), [GLSL Sandbox](http://glslsandbox.com/), [iq's Website](http://www.iquilezles.org/www/index.htm)
