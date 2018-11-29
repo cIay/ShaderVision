@@ -61,7 +61,7 @@ uniform float avgEnergy;     // average total energy in the last second
   3. By dropping a text file into the shader-list area within the main dropdown page
 - Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss dropdown page.
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
-- The target media item is the video with the largest dimensions. If no video is present then the largest image is chosen instead.
+- The target media item will be the video with the largest dimensions, unless no video is present in which case the largest image is chosen instead.
 - You may experience performance issues if the dimensions of your target video/image are too large.
 - Useful links: 
   - [The Book of Shaders](https://thebookofshaders.com/)
