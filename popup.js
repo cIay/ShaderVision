@@ -129,11 +129,20 @@ function SelectionHandler() {
   }
 
   this.switch = () => {
+    function firstListedShader(shaderList) {
+      for (let i = 0; i < shaderList.length; i++) {
+        if (shaderList[i].style.display != 'none') {
+          return shaderList[i];
+        }
+      }
+      return null;
+    }
     if (!settingsOpen()) {
+      console.log(prevSelected);
       if (prevSelected.status == 'active') {
         if (!prevSelected.savedSelection || (prevSelected.savedSelection 
             && (!prevSelected.savedSelection.isConnected || prevSelected.savedSelection.style.display == 'none'))) {
-          prevSelected.savedSelection = savedShaders[0];
+          prevSelected.savedSelection = firstListedShader(savedShaders);
         }
         if (prevSelected.savedSelection && prevSelected.savedSelection.isConnected) {
           this.highlight(prevSelected.savedSelection, 'saved');
@@ -142,7 +151,7 @@ function SelectionHandler() {
       else {
         if (!prevSelected.activeSelection || (prevSelected.activeSelection 
             && (!prevSelected.activeSelection.isConnected || prevSelected.activeSelection.style.display == 'none'))) {
-          prevSelected.activeSelection = activeShaders[0];
+          prevSelected.activeSelection = firstListedShader(activeShaders);
         }
         if (prevSelected.activeSelection && prevSelected.activeSelection.isConnected) {
           this.highlight(prevSelected.activeSelection, 'active');
@@ -470,7 +479,7 @@ function updateAnimation(item) {
 
 
 $("#saved-shaders-wrapper").resizable({
-  zIndex: "auto",
+  //zIndex: "auto",
   handles: "s",
   minHeight: 40,
   maxHeight: $("#table-container").height() - 40,
