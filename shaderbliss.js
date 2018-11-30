@@ -65,10 +65,6 @@ function main() {
     elements.media = elements.image;
   }
 
-  if ((new URL(elements.media.currentSrc)).origin != window.location.origin) {
-    elements.media.crossOrigin = 'anonymous';
-  }
-
   initCanvas(elements);
 
   const gl = elements.canvas.getContext('webgl2', {

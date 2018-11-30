@@ -531,7 +531,7 @@ $("#active-shaders").sortable({
         selectionHandler.highlight(ui.item.context, "active-shaders");
       });
     }
-    //chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
     updateAnimation(ui.item.context);
   }
 });
