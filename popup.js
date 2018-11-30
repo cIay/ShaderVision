@@ -32,80 +32,6 @@ function createShaderList(id) {
 
 function SelectionHandler() {
 
-  function SelectedControls(handler) {
-
-    this.run = () => {
-      if (searchBar != document.activeElement && !settingsOpen() 
-          && prevSelected.selection && prevSelected.selection.isConnected) {
-
-        chrome.runtime.getBackgroundPage(function(bg) {
-          bg.applyShaders([prevSelected.selection.firstChild.innerText]);
-        });
-      }
-    };
-
-    this.add = () => {
-      if (searchBar != document.activeElement && !settingsOpen() 
-          && prevSelected.selection && prevSelected.selection.isConnected) {
-        
-        if (prevSelected.status == 'active') {
-          cloneAction(prevSelected.selection);
-        }
-        else {
-          addAction(prevSelected.selection);
-        }
-      }
-    };
-
-    this.remove = () => {
-      if (searchBar != document.activeElement && !settingsOpen() 
-          && prevSelected.selection && prevSelected.selection.isConnected) {
-
-        if (prevSelected.selection.previousSibling) {
-          var sibling = prevSelected.selection.previousSibling;
-        }
-        else {
-          var sibling = prevSelected.selection.nextSibling;
-        }
-
-        if (prevSelected.status == 'active') {
-          removeAction(prevSelected.selection);
-        }
-        else {
-          //deleteAction(prevSelected.selection);
-        }
-
-        handler.highlight(sibling);
-      }
-    };
-
-    this.swapUp = () => {
-      if (searchBar != document.activeElement && !settingsOpen() 
-          && prevSelected.selection && prevSelected.selection.isConnected) {
-
-        const sibling = prevSelected.selection.previousSibling;
-        if (prevSelected.status == 'active' && sibling) {
-          sibling.parentNode.insertBefore(prevSelected.selection, sibling);
-          prevSelected.selection.scrollIntoView({block: 'nearest'});
-        }
-      }
-    };
-
-    this.swapDown = () => {
-      if (searchBar != document.activeElement && !settingsOpen() 
-          && prevSelected.selection && prevSelected.selection.isConnected) {
-
-        const sibling = prevSelected.selection.nextSibling;
-        if (prevSelected.status == 'active' && sibling) {
-          sibling.parentNode.insertBefore(sibling, prevSelected.selection);
-          prevSelected.selection.scrollIntoView({block: 'nearest'});
-        }
-      }
-    };
-  }
-
-  this.selectedControls = new SelectedControls(this);
-
   const prevSelected = {
     status: 'active',
     selection: null,
@@ -128,6 +54,80 @@ function SelectionHandler() {
     return document.getElementById("options-page").style.display == 'block';
   }
 
+  function SelectedControls(handler) {
+
+    function validSelection() {
+      return (searchBar != document.activeElement && 
+              !settingsOpen() && 
+              prevSelected.selection && 
+              prevSelected.selection.isConnected);
+    }
+
+    this.run = () => {
+      if (validSelection()) {
+        chrome.runtime.getBackgroundPage(function(bg) {
+          bg.applyShaders([prevSelected.selection.firstChild.innerText]);
+        });
+      }
+    };
+
+    this.add = () => {
+      if (validSelection()) {
+        if (prevSelected.status == 'active') {
+          cloneAction(prevSelected.selection);
+        }
+        else {
+          addAction(prevSelected.selection);
+        }
+      }
+    };
+
+    this.remove = () => {
+      if (validSelection()) {
+        if (prevSelected.selection.nextSibling) {
+          var sibling = prevSelected.selection.nextSibling;
+        }
+        else {
+          var sibling = prevSelected.selection.previousSibling;
+        }
+
+        if (prevSelected.status == 'active') {
+          removeAction(prevSelected.selection);
+        }
+        else {
+          //deleteAction(prevSelected.selection);
+        }
+
+        handler.highlight(sibling);
+      }
+    };
+
+    this.swapUp = () => {
+      if (validSelection()) {
+        const sibling = prevSelected.selection.previousSibling;
+        if (prevSelected.status == 'active' && sibling) {
+          sibling.parentNode.insertBefore(prevSelected.selection, sibling);
+          prevSelected.selection.scrollIntoView({block: 'nearest'});
+          chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+        }
+      }
+    };
+
+    this.swapDown = () => {
+      if (validSelection()) {
+        const sibling = prevSelected.selection.nextSibling;
+        if (prevSelected.status == 'active' && sibling) {
+          sibling.parentNode.insertBefore(sibling, prevSelected.selection);
+          prevSelected.selection.scrollIntoView({block: 'nearest'});
+          chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+        }
+      }
+    };
+  }
+
+  this.selectedControls = new SelectedControls(this);
+
+
   this.switch = () => {
     function firstListedShader(shaderList) {
       for (let i = 0; i < shaderList.length; i++) {
@@ -144,6 +144,7 @@ function SelectionHandler() {
           prevSelected.savedSelection = firstListedShader(savedShaders);
         }
         if (prevSelected.savedSelection && prevSelected.savedSelection.isConnected) {
+          prevSelected.savedSelection.scrollIntoView({block: 'nearest'});
           this.highlight(prevSelected.savedSelection, 'saved');
         }
       }
@@ -153,6 +154,7 @@ function SelectionHandler() {
           prevSelected.activeSelection = firstListedShader(activeShaders);
         }
         if (prevSelected.activeSelection && prevSelected.activeSelection.isConnected) {
+          prevSelected.activeSelection.scrollIntoView({block: 'nearest'});
           this.highlight(prevSelected.activeSelection, 'active');
         }
       }
@@ -529,7 +531,7 @@ $("#active-shaders").sortable({
         selectionHandler.highlight(ui.item.context, "active-shaders");
       });
     }
-    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+    //chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
     updateAnimation(ui.item.context);
   }
 });
