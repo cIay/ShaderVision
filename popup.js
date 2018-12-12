@@ -272,6 +272,7 @@ document.addEventListener('keydown', (e) => {
       break;
 
     case ' ':
+      e.preventDefault();
       selectionHandler.selectedControls.run();
       break;
   }
@@ -383,10 +384,9 @@ function appendButton(iconType, div, tooltip, onClick) {
   button.classList.add("ui-icon-" + iconType);
   button.classList.add("shader-icon");
   button.title = tooltip;
-  button.addEventListener('click', function() {
+  button.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
     onClick(div);
-  });
-  button.addEventListener('click', function() {
     buttonAnimation(button);
   });
   div.appendChild(button);
@@ -504,7 +504,6 @@ function makeDraggable() {
   });
 }
 
-
 $("#active-shaders").sortable({
   containment: "#active-shaders-wrapper",
   axis: "y",
@@ -537,7 +536,6 @@ $("#active-shaders").sortable({
 });
 
 $("#table-container").disableSelection();
-
 
 chrome.runtime.getBackgroundPage(function(bg) {
   bg.readRemLoad(refreshShaderList);
