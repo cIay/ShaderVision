@@ -3,6 +3,7 @@ let flags = {
   execNewShaders: false,
   resetFBO: false,
   resetAudio: false,
+  takeScreenshot: false
 };
 let state = {
   audioSource: null, // 'video', 'mic', 'none'
@@ -68,7 +69,8 @@ function main() {
   initCanvas(elements);
 
   const gl = elements.canvas.getContext('webgl2', {
-    preserveDrawingBuffer: true
+    powerPreference: "high-performance",
+    preserveDrawingBuffer: false
   });
   if (!gl) {
     alert('ShaderBliss: Unable to initialize WebGL. Your browser or machine may not support it.'); 
@@ -95,7 +97,7 @@ function main() {
       }
       else if (e.key == 's') {
         if (fragShaders) {
-          recorder.takeScreenshot();
+          flags.takeScreenshot = true;
         }
       }
       else if (e.key == 'a') {
@@ -164,10 +166,13 @@ function execShaders(gl, settings, elements, audio, recorder) {
   let pingPongData = initFboPingPong(gl, programInfo);
   flags.resetFBO = false;
 
+  const elapsed = performance.now();
   let prevTime = 0.0;
+  let frameCount = 0;
 
   // Draw the scene repeatedly
   function render(time) {
+    time -= elapsed;
     time *= 0.001;  // convert to seconds
     const deltaTime = time - prevTime;
     prevTime = time;
@@ -204,7 +209,7 @@ function execShaders(gl, settings, elements, audio, recorder) {
       endProgram();
       return;
     }
-    
+
     const uniforms = {
       mouse: mouseCoords,
       bass: low,
@@ -216,9 +221,17 @@ function execShaders(gl, settings, elements, audio, recorder) {
       energy: total,
       avgEnergy: audio.averageEnergyHistory(audio.totalHistory),
       time: time,
-      deltaTime: deltaTime
+      deltaTime: deltaTime,
+      frameCount: frameCount
     };
     drawScene(gl, programInfo, buffer, pingPongData, uniforms);
+
+    if (flags.takeScreenshot) {
+      recorder.takeScreenshot();
+      flags.takeScreenshot = false;
+    }
+    
+    frameCount++;
 
     requestAnimationFrame(render);
   }
@@ -277,7 +290,7 @@ function initFboPingPong(gl, programInfo) {
 }
 
 
-// Copy the video texture
+// Copy the video/image texture
 function updateTexture(gl, texture, media) {
   const level = 0;
   const internalFormat = gl.RGBA;
@@ -326,8 +339,8 @@ function updateAudio(gl, freqTexture, timeTexture, audio) {
 function clearScene(gl) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
   gl.clearDepth(1.0);                 // Clear everything
-  gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-  gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+  //gl.enable(gl.DEPTH_TEST);           // Enable depth testing
+  //gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
 
   // Clear the canvas before we start drawing on it.
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -339,6 +352,7 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
     gl.uniform1i(programInfo[programIndex].uniformLocations.frame, 0);
+    //gl.uniform1i(programInfo[programIndex].uniformLocations.prevDraw, (uniforms.frameCount > 0) ? 3 : 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
     gl.uniform2f(programInfo[programIndex].uniformLocations.mouse, 
@@ -356,13 +370,13 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
     gl.uniform1f(programInfo[programIndex].uniformLocations.time, uniforms.time);
     gl.uniform1f(programInfo[programIndex].uniformLocations.deltaTime, uniforms.deltaTime);
 
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);  
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
   // Apply each shader by fbo ping-ponging
-  for (let i = 0; i < programInfo.length; i++) {
-    {
+  for (var i = 0; i < programInfo.length; i++) {
+    { 
       const numComponents = 2;
       const type = gl.FLOAT;
       const normalize = false;
@@ -378,17 +392,25 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
     gl.useProgram(programInfo[i].program);
     // Tell WebGL we want to affect texture unit 0
     gl.activeTexture(gl.TEXTURE0);
-    
+
     if (i != programInfo.length-1) {
       bindAndDraw(i, pingPongData.framebuffers[i%2]);
       gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[i%2]);
     }
-    else if (programInfo.length > 1) {
-      gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[(i+1)%2]);
-    }
   }
+
   bindAndDraw(programInfo.length-1, null);
 
+  /*
+  (function saveDraw() {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pingPongData.framebuffers[uniforms.frameCount%2+2]);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[uniforms.frameCount%2+2]);
+    gl.activeTexture(gl.TEXTURE0);
+  })();
+  */
 }
 
 function initPrograms(gl) {
@@ -415,6 +437,7 @@ function initPrograms(gl) {
       },
       uniformLocations: {
         frame: gl.getUniformLocation(shaderPrograms[i], 'frame'),
+        //prevDraw: gl.getUniformLocation(shaderPrograms[i], 'prevDraw'),
         resolution: gl.getUniformLocation(shaderPrograms[i], 'resolution'),
         mouse: gl.getUniformLocation(shaderPrograms[i], 'mouse'),
         freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
@@ -732,7 +755,9 @@ function Recorder(canvas) {
   };
 
   this.takeScreenshot = () => {
-    chrome.runtime.sendMessage({tabUrl: canvas.toDataURL('image/png')});
+    canvas.toBlob(function(png) {
+      chrome.runtime.sendMessage({tabUrl: URL.createObjectURL(png)});
+    });
   };
 
 // Private:
@@ -754,7 +779,7 @@ function Recorder(canvas) {
 
     mediaRecorder.onstop = () => {
       const buf = new Blob(recordedBlobs, {type: this.options.mimeType});
-      const recSource = window.URL.createObjectURL(buf);
+      const recSource = URL.createObjectURL(buf);
       chrome.runtime.sendMessage({tabUrl: recSource});
     }
 
