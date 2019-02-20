@@ -151,7 +151,7 @@ function execShaders(gl, settings, textures, elements, audio, recorder) {
     hideCanvas(elements);
     console.log("ShaderVision: Dead");
   }
-  const programInfo = initPrograms(gl);
+  const programInfo = initPrograms(gl, textures.length);
   if (programInfo === null) {
     endProgram();
     return;
@@ -228,7 +228,7 @@ function execShaders(gl, settings, textures, elements, audio, recorder) {
       deltaTime: deltaTime,
       frameCount: frameCount
     };
-    drawScene(gl, programInfo, buffer, pingPongData, uniforms);
+    drawScene(gl, programInfo, buffer, pingPongData, uniforms, textures.length);
 
     if (flags.takeScreenshot) {
       recorder.takeScreenshot();
@@ -362,14 +362,14 @@ function clearScene(gl) {
   gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
-function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
+function drawScene(gl, programInfo, buffer, pingPongData, uniforms, numTextures) {
 
   function bindAndDraw(programIndex, fbo) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
     gl.uniform1i(programInfo[programIndex].uniformLocations.frame, 0);
-    for (let i = 0; i < 6; i++) {
-      gl.uniform1i(programInfo[programIndex].uniformLocations[`tex${i}`], 3+i);
+    for (let i = 0; i < numTextures; i++) {
+      gl.uniform1i(programInfo[programIndex].uniformLocations[`tex${i+1}`], 3+i);
     }
     //gl.uniform1i(programInfo[programIndex].uniformLocations.prevDraw, (uniforms.frameCount > 0) ? 3 : 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
@@ -432,7 +432,7 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
   */
 }
 
-function initPrograms(gl) {
+function initPrograms(gl, numTextures) {
 
   if (fragShaders.length == 0) {
     return null;
@@ -473,8 +473,8 @@ function initPrograms(gl) {
         deltaTime: gl.getUniformLocation(shaderPrograms[i], 'deltaTime')
       }
     });
-    for (let j = 0; j < 6; j++) {
-      programInfo[i].uniformLocations[`tex${j}`] = gl.getUniformLocation(shaderPrograms[i], `tex${j}`);
+    for (let j = 0; j < numTextures; j++) {
+      programInfo[i].uniformLocations[`tex${j+1}`] = gl.getUniformLocation(shaderPrograms[i], `tex${j+1}`);
     }
   }
 

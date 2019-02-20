@@ -19,7 +19,7 @@ ShaderVision is a Chrome extension that lets you write fragment shaders and appl
 
 
 #### Editor ([CodeMirror](https://codemirror.net/) defaults)
-* __Ctrl-S__: Save
+* __Ctrl-S__: Save and apply selected shaders
 
 #### Target page
 * __Alt-R__: Start/stop recording
@@ -30,6 +30,7 @@ ShaderVision is a Chrome extension that lets you write fragment shaders and appl
 ```glsl
 uniform vec2 resolution;     // intrinsic width and height of the WebGL canvas in pixels
 uniform sampler2D frame;     // active frame texture
+uniform sampler2D texN;      // input texture where N is the slot number (from 1 to 6)
 uniform float time;          // time since the shader began running in seconds
 uniform float deltaTime;     // time since the last draw in seconds
 uniform vec2 mouse;          // mouse location coordinates
@@ -63,7 +64,7 @@ uniform float avgEnergy;     // average total energy in the last second
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
 - The target media item will be the video with the largest dimensions, unless no video is present in which case the largest image is chosen instead.
 - You may experience performance issues if the dimensions of your target video/image are too large.
-- Useful links: 
+- Very useful links: 
   - [The Book of Shaders](https://thebookofshaders.com/)
   - [Shadertoy](https://www.shadertoy.com/)
   - [GLSL Sandbox](http://glslsandbox.com/)
