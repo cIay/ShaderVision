@@ -12,16 +12,19 @@ uniform float avgBass;
 
 bool beat(float e, float E, float C) { return e > E*C; }
 
+float getAberrationFactor() {
+	if (beat(bass, avgBass, 1.3)) {
+		return bass * 30.0;
+	}
+	else {
+		return bass * 20.0;
+	}
+}
+
 void main(void) {
 	vec2 uv = gl_FragCoord.xy / resolution.xy;
 
-	float aberrationFactor;;
-	if (beat(bass, avgBass, 1.3)) {
-		aberrationFactor = bass * 50.0;
-	}
-	else {
-		aberrationFactor = bass * 20.0;
-	}
+	float aberrationFactor = getAberrationFactor();
 
 	float xTrans = uv.x*2.0 - 1.0;
 	float yTrans = 1.0 - uv.y*2.0;

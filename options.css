@@ -5,7 +5,7 @@
   width: 60%;
   height: 60%;
   top: 15px;
-  left: 27px;
+  left: 49px;
   background-color: white;
   box-shadow: 0 0 3px 1px white;
 }
@@ -25,6 +25,7 @@
 }
 
 .options-section-header {
+  padding-left: 2px;
   font-size: 11px;
   border-bottom: 1px solid black;
   cursor: default;
@@ -36,6 +37,7 @@
 }
 
 .options-label {
+  padding-left: 2px;
   font-size: 9px;
   cursor: default;
 }

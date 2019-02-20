@@ -73,7 +73,7 @@ function main() {
     preserveDrawingBuffer: false
   });
   if (!gl) {
-    alert('ShaderBliss: Unable to initialize WebGL. Your browser or machine may not support it.'); 
+    alert('ShaderVision: Unable to initialize WebGL. Your browser or machine may not support it.'); 
     return;
   }
 
@@ -107,48 +107,49 @@ function main() {
   });
 
   chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-    if (request.target == 'canvas') {
-      if (request.ping) {
-        sendResponse({pong: true});
+    if (request.target != 'canvas') {
+      return;
+    }
+
+    if (request.ping) {
+      sendResponse({pong: true});
+    }
+    else if (request.shaders && request.settings) {
+      applySettings(request.settings, audio, recorder);
+      initMediaStream(elements, audio, recorder);
+
+      if (fragShaders === null) {
+        showCanvas(elements);
+        hideMedia(elements);
+        fragShaders = request.shaders.contents;
+        execShaders(gl, request.settings, request.textures, elements, audio, recorder);
       }
-
-      else if (request.shaders && request.settings) {
-        applySettings(request.settings, audio, recorder);
-        initMediaStream(elements, audio, recorder);
-
-        if (fragShaders === null) {
-          showCanvas(elements);
-          hideMedia(elements);
-          fragShaders = request.shaders.contents;
-          execShaders(gl, request.shaders.settings, elements, audio, recorder);
-        }
-        else {
-          flags.execNewShaders = true;
-          // wait for previous render loop to return
-          (function waitThenExecute() {
-            if (flags.execNewShaders) {
-              setTimeout(waitThenExecute, 50);
-            }
-            else {
-              fragShaders = request.shaders.contents;
-              execShaders(gl, request.shaders.settings, elements, audio, recorder);
-            }
-          })();
-        }
+      else {
+        flags.execNewShaders = true;
+        // wait for previous render loop to return
+        (function waitThenExecute() {
+          if (flags.execNewShaders) {
+            setTimeout(waitThenExecute, 50);
+          }
+          else {
+            fragShaders = request.shaders.contents;
+            execShaders(gl, request.settings, request.textures, elements, audio, recorder);
+          }
+        })();
       }
     }
   });
 }
 
 
-function execShaders(gl, settings, elements, audio, recorder) {
-  console.log("ShaderBliss: Running...");
+function execShaders(gl, settings, textures, elements, audio, recorder) {
+  console.log("ShaderVision: Running...");
 
   function endProgram() {
     fragShaders = null;
     showMedia(elements);
     hideCanvas(elements);
-    console.log("ShaderBliss: Dead");
+    console.log("ShaderVision: Dead");
   }
   const programInfo = initPrograms(gl);
   if (programInfo === null) {
@@ -164,6 +165,9 @@ function execShaders(gl, settings, elements, audio, recorder) {
   const freqTexture = initTexture(gl); 
   const timeTexture = initTexture(gl);
   let pingPongData = initFboPingPong(gl, programInfo);
+
+  initImageTextures(gl, textures);
+  
   flags.resetFBO = false;
 
   const elapsed = performance.now();
@@ -264,6 +268,22 @@ function initTexture(gl) {
   return texture;
 }
 
+function initImageTextures(gl, textures) {
+  if (!textures) {
+    return;
+  }
+  for (let i = 0; i < textures.length; i++) {
+    const img = new Image();
+    img.src = textures[i];
+    img.addEventListener('load', function() {
+      gl.activeTexture(gl.TEXTURE3+i);
+      gl.bindTexture(gl.TEXTURE_2D, initTexture(gl));
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.activeTexture(gl.TEXTURE0);
+    });
+  }
+}
+
 function initFboPingPong(gl, programInfo) {
   if (programInfo.length == 1) {
     return null;
@@ -337,13 +357,9 @@ function updateAudio(gl, freqTexture, timeTexture, audio) {
 }
 
 function clearScene(gl) {
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-  gl.clearDepth(1.0);                 // Clear everything
-  //gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-  //gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
-
-  // Clear the canvas before we start drawing on it.
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // Clear to black, fully opaque
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
 function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
@@ -352,6 +368,9 @@ function drawScene(gl, programInfo, buffer, pingPongData, uniforms) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
     gl.uniform1i(programInfo[programIndex].uniformLocations.frame, 0);
+    for (let i = 0; i < 6; i++) {
+      gl.uniform1i(programInfo[programIndex].uniformLocations[`tex${i}`], 3+i);
+    }
     //gl.uniform1i(programInfo[programIndex].uniformLocations.prevDraw, (uniforms.frameCount > 0) ? 3 : 0);
     gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
@@ -454,6 +473,9 @@ function initPrograms(gl) {
         deltaTime: gl.getUniformLocation(shaderPrograms[i], 'deltaTime')
       }
     });
+    for (let j = 0; j < 6; j++) {
+      programInfo[i].uniformLocations[`tex${j}`] = gl.getUniformLocation(shaderPrograms[i], `tex${j}`);
+    }
   }
 
   return programInfo;
@@ -473,7 +495,7 @@ function initShaderProgram(gl, vsSource, fsSource) {
   gl.linkProgram(shaderProgram);
 
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    alert('ShaderBliss: Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+    alert('ShaderVision: Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
     return null;
   }
 
@@ -488,7 +510,7 @@ function loadShader(gl, type, source) {
   gl.compileShader(shader);
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    alert('ShaderBliss: An error occurred compiling the shader: ' + gl.getShaderInfoLog(shader));
+    alert('ShaderVision: An error occurred compiling the shader: ' + gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }
@@ -575,7 +597,7 @@ function initCanvas(elements) {
     elements.canvas.parentNode.removeChild(elements.canvas);
   }
   elements.canvas = document.createElement('canvas');
-  elements.canvas.id = 'shaderbliss-canvas';
+  elements.canvas.id = 'shadervision-canvas';
   elements.canvas.style.margin = '0px auto';
   elements.canvas.style.display = 'block';
   elements.canvas.style.visibility = 'hidden';
@@ -764,7 +786,7 @@ function Recorder(canvas) {
   let mediaRecorder;
 
   let recIcon = document.createElement('img');
-  recIcon.id = 'shaderbliss-rec';
+  recIcon.id = 'shadervision-rec';
   recIcon.src = chrome.runtime.getURL("images/rec64.png");
   recIcon.style.position = 'absolute';
   recIcon.style.top = '0%';
@@ -792,13 +814,13 @@ function Recorder(canvas) {
     const timeslice = 3000; // ms
     mediaRecorder.start(timeslice);
 
-    console.log("ShaderBliss: Started recording");
+    console.log("ShaderVision: Started recording");
     canvas.insertAdjacentElement('afterend', recIcon);
   };
 
   let stopRecording = () => {
     mediaRecorder.stop();
-    console.log("ShaderBliss: Stopped recording");
+    console.log("ShaderVision: Stopped recording");
     canvas.parentElement.removeChild(recIcon);
   };
 }
@@ -915,7 +937,7 @@ function AudioProcessor() {
 function initMediaStream(elements, audio, recorder) {
 
   if (state.audioSource == 'mic') {
-    let contraints = {
+    let constraints = {
       channelCount : {ideal: 2},
       autoGainControl: false,
       echoCancellation: false,
@@ -923,7 +945,7 @@ function initMediaStream(elements, audio, recorder) {
     };
 
     //console.log(navigator.mediaDevices.getSupportedConstraints());
-    navigator.mediaDevices.getUserMedia({audio: contraints}).then((stream) => {
+    navigator.mediaDevices.getUserMedia({audio: constraints}).then((stream) => {
       try {
         audio.streamSource = audio.context.createMediaStreamSource(stream);
       } catch {}

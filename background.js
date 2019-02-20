@@ -19,13 +19,14 @@ chrome.runtime.onStartup.addListener(function() {
 });
 */
 const storageKeys = [
-  'settings', 
+  'settings',
+  'textures',
   'activeShaders', 
   'savedShaders'
 ];
 
 const runScripts = [
-  'shaderbliss.js'
+  'shadervision.js'
 ];
 const editScripts = [
   'panel.js', 
@@ -40,6 +41,67 @@ const editStyling = [
   'lib/codemirror/theme/dracula.css',
   'lib/codemirror/lib/codemirror.css'
 ];
+
+
+chrome.runtime.onInstalled.addListener(function() {
+  chrome.contextMenus.create({
+    id: "textureId",
+    title: "Add texture",
+    contexts: ['image']
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(function(info, tab) {
+  fetchDataURL(info.srcUrl, function(result) {
+    storeTexture(result)
+  });
+});
+
+function fetchDataURL(url, callback) {
+  const xhr = new XMLHttpRequest();
+  xhr.addEventListener('load', function() {
+    const fileReader = new FileReader();
+    fileReader.addEventListener('loadend', function(e) {
+      callback(fileReader.result);
+    });
+    fileReader.readAsDataURL(xhr.response);
+  });
+  xhr.open('GET', url);
+  xhr.responseType = 'blob';
+  xhr.send();
+}
+
+// Store the image in the first texture slot, pushing down any existing textures
+function storeTexture(dataUrl) {
+  chrome.storage.local.get(['textures'], function(result) {
+    if (!result.textures) {
+      result.textures = {};
+    }
+    const len = result.textures.length;
+    let cur, prev = dataUrl;
+    let i = 0;
+    do {
+      cur = result.textures[i];
+      result.textures[i] = prev;
+      prev = cur;
+      i++;
+    } while (cur && i < len);
+
+    function flashInvertedIcon(time) {
+      chrome.browserAction.setIcon({path: "images/icon16i.png"});
+      setTimeout(function() {
+        chrome.browserAction.setIcon({path: "images/icon16.png"});
+      }, time);
+    }
+
+    chrome.storage.local.set(result, function() {
+      flashInvertedIcon(500);
+    });
+  });
+}
+
+
+
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.tabUrl) {
@@ -62,7 +124,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 function storeShader(name, contents, sendResponse) {
   chrome.storage.local.get(['savedShaders'], function(result) {
-    // if file does not yet exist and isn't a banned name, or it does exist and isn't read-only
+    // if file does not yet exist and isn't a storage key, or it does exist and isn't read-only
     if ((!result.savedShaders[name] && storageKeys.indexOf(name) == -1) || 
         (result.savedShaders[name] && !result.savedShaders[name].inFileSystem)) {
 
@@ -76,6 +138,7 @@ function storeShader(name, contents, sendResponse) {
       chrome.storage.local.set(result, function() {
         if (sendResponse) {
           sendResponse({success: Boolean(!chrome.runtime.lastError)});
+          applyShaders();
         }
       });
     }
@@ -89,19 +152,8 @@ function storeShader(name, contents, sendResponse) {
 function applyShaders(shaders) {
   chrome.tabs.query({active:true, currentWindow: true}, function(tabs) {
     chrome.tabs.sendMessage(tabs[0].id, {target: 'canvas', ping: true}, function(response) {
-      if (!shaders) {
-        chrome.storage.local.get(['activeShaders'], function(result) {
-          if (!response) {
-            executeChain(runScripts, function() {
-              sendShaders(tabs[0].id, 'canvas', result.activeShaders);
-            });
-          }
-          else if (response.pong) {
-            sendShaders(tabs[0].id, 'canvas', result.activeShaders);
-          }
-        });
-      }
-      else {
+
+      function activate(shaders) {
         if (!response) {
           executeChain(runScripts, function() {
             sendShaders(tabs[0].id, 'canvas', shaders);
@@ -111,6 +163,16 @@ function applyShaders(shaders) {
           sendShaders(tabs[0].id, 'canvas', shaders);
         }
       }
+
+      if (!shaders) {
+        chrome.storage.local.get(['activeShaders'], function(result) {
+          activate(result.activeShaders);
+        });
+      }
+      else {
+        activate(shaders);
+      }
+
     });
   });
 }
@@ -143,7 +205,7 @@ function sendShaders(targetTab, targetScript, fileList) {
   let noActiveShaders = false;
   if (!fileList || fileList.length == 0) {
     noActiveShaders = true;
-    query = ['settings'];
+    query = ['settings', 'textures'];
   }
   else {
     if (!Array.isArray(fileList)) {
@@ -152,26 +214,37 @@ function sendShaders(targetTab, targetScript, fileList) {
 
     query = Array.from(new Set(fileList));
     query.push('settings');
+    query.push('textures');
     query.push('savedShaders');
   }
 
   readRemLoad(function() {
     chrome.storage.local.get(query, function(result) {
-      if (noActiveShaders) {
-        //TODO: write getNewFilename() which appends an incrementing number to the 'New Shader' name
-        chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
-        return;
+
+      function sendMessage() {
+        chrome.tabs.sendMessage(targetTab, {
+          target: targetScript, 
+          shaders: shaderObj, 
+          settings: result.settings, 
+          textures: result.textures
+        });
       }
 
-      fileList.forEach(function(name) {
-        // check if the file exists
-        if (result.savedShaders[name]) {
-          shaderObj.names.push(name);
-          shaderObj.contents.push(result[name].text);
-          shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
-        }
-      });
-      chrome.tabs.sendMessage(targetTab, {target: targetScript, shaders: shaderObj, settings: result.settings});
+      if (noActiveShaders) {
+        //TODO: write getNewFilename() which appends an incrementing number to the 'New Shader' name
+        sendMessage();
+      }
+      else {
+        fileList.forEach(function(name) {
+          // check if the file exists
+          if (result.savedShaders[name]) {
+            shaderObj.names.push(name);
+            shaderObj.contents.push(result[name].text);
+            shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
+          }
+        });
+        sendMessage();
+      }
     });
   });
 }
@@ -252,7 +325,6 @@ function loadFiles(entries, savedShaders, dropped, callback) {
 
     function readFile(shaderFile) {
       const fileReader = new FileReader();
-
       fileReader.addEventListener('loadend', function(e) {
         if ((dropped && savedShaders[shaderFile.name] && savedShaders[shaderFile.name].inFileSystem) ||
             (storageKeys.indexOf(shaderFile.name) != -1)) {

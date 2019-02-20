@@ -1,9 +1,9 @@
-# ![icon48](https://user-images.githubusercontent.com/10470041/48099653-87f80300-e1dd-11e8-8ef1-68d44ba24f8b.png) ShaderBliss
-ShaderBliss is a Chrome extension that lets you write fragment shaders and apply them to videos and images on the web.
+# ![icon48](https://user-images.githubusercontent.com/10470041/48099653-87f80300-e1dd-11e8-8ef1-68d44ba24f8b.png) ShaderVision
+ShaderVision is a Chrome extension that lets you write fragment shaders and apply them to videos and images on the web.
 
 ## Installation
-[Download ZIP](https://github.com/cIay/ShaderBliss/archive/master.zip) & extract, then:
-> Customize and control Google Chrome -> More tools -> Extensions -> Load unpacked (Developer mode must be on)
+[Download ZIP](https://github.com/cIay/ShaderVision/archive/master.zip) & extract, then:
+> Customize and control Google Chrome -> More tools -> [Extensions](chrome://extensions/) -> Load unpacked (Developer mode must be on)
 
 ## Hotkeys
 #### Dropdown
@@ -57,9 +57,9 @@ uniform float avgEnergy;     // average total energy in the last second
 ## Miscellaneous Info
 - Files can be added in three different ways: 
   1. By opening the editor (via the 'New file' or 'Edit' button) and saving with Ctrl-S 
-  2. By saving your file directly to the 'glsl' directory in your ShaderBliss folder
+  2. By saving your file directly to the 'glsl' directory in your ShaderVision folder
   3. By dropping a text file into the shader-list area within the main dropdown page
-- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderBliss dropdown page.
+- Files in the 'glsl' directory are considered read-only by the extension and cannot be changed or removed through the ShaderVision dropdown page.
 - Due to cross-origin restrictions image or video data will sometimes be inaccessible. If this is the case a new tab will open using the source as the URL. You should then be able to use the extension as usual in this new tab.
 - The target media item will be the video with the largest dimensions, unless no video is present in which case the largest image is chosen instead.
 - You may experience performance issues if the dimensions of your target video/image are too large.

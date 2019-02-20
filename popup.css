@@ -4,6 +4,7 @@ html {
   margin: 0;
   padding: 0px 2px 0px 2px;
   background: white;
+  user-select: none;
 }
 
 body {
@@ -139,7 +140,7 @@ body {
   }
 }
 
-@keyframes highlight { /* on adding a shader or saving settings */
+@keyframes highlight { /* on adding a shader, moving a texture, or saving settings */
   15% {
     background-color: hsla(155, 90%, 55%, 80%);
   }

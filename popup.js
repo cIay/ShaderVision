@@ -23,7 +23,7 @@ function createShaderList(id) {
   const shaderList = [];
   const shaderElements = document.getElementById(id);
   for (let i = 0; i < shaderElements.children.length; i++) {
-    shaderList.push(shaderElements.children[i].innerText.slice(0, -1));
+    shaderList.push(shaderElements.children[i].innerText);
   }
   return shaderList;
 }
@@ -50,77 +50,88 @@ function SelectionHandler() {
   const savedShaders = document.getElementById("saved-shaders").children;
   const activeShaders = document.getElementById("active-shaders").children;
 
-  function settingsOpen() {
-    return document.getElementById("options-page").style.display == 'block';
+  function overlayPageOpen() {
+    return (document.getElementById("options-page").style.display == 'block' ||
+            document.getElementById("textures-page").style.display == 'block');
   }
 
   function SelectedControls(handler) {
 
     function validSelection() {
       return (searchBar != document.activeElement && 
-              !settingsOpen() && 
+              !overlayPageOpen() && 
               prevSelected.selection && 
               prevSelected.selection.isConnected);
     }
 
     this.run = () => {
-      if (validSelection()) {
-        chrome.runtime.getBackgroundPage(function(bg) {
-          bg.applyShaders([prevSelected.selection.firstChild.innerText]);
-        });
+      if (!validSelection()) {
+        return;
       }
+      chrome.runtime.getBackgroundPage(function(bg) {
+        bg.applyShaders([prevSelected.selection.firstChild.innerText]);
+      });
     };
 
     this.add = () => {
-      if (validSelection()) {
-        if (prevSelected.status == 'active') {
-          cloneAction(prevSelected.selection);
-        }
-        else {
-          addAction(prevSelected.selection);
-        }
+      if (!validSelection()) {
+        return;
+      }
+
+      if (prevSelected.status == 'active') {
+        cloneAction(prevSelected.selection);
+      }
+      else {
+        addAction(prevSelected.selection);
       }
     };
 
     this.remove = () => {
-      if (validSelection()) {
-        if (prevSelected.selection.nextSibling) {
-          var sibling = prevSelected.selection.nextSibling;
-        }
-        else {
-          var sibling = prevSelected.selection.previousSibling;
-        }
-
-        if (prevSelected.status == 'active') {
-          removeAction(prevSelected.selection);
-        }
-        else {
-          //deleteAction(prevSelected.selection);
-        }
-
-        handler.highlight(sibling);
+      if (!validSelection() || prevSelected.status != 'active') {
+        return;
       }
+
+      if (prevSelected.selection.nextSibling) {
+        var sibling = prevSelected.selection.nextSibling;
+      }
+      else {
+        var sibling = prevSelected.selection.previousSibling;
+      }
+
+      removeAction(prevSelected.selection);
+      /*
+      if (prevSelected.status == 'active') {
+        removeAction(prevSelected.selection);
+      }
+      else {
+        deleteAction(prevSelected.selection);
+      }
+      */
+
+      handler.highlight(sibling);
     };
 
     this.swapUp = () => {
-      if (validSelection()) {
-        const sibling = prevSelected.selection.previousSibling;
-        if (prevSelected.status == 'active' && sibling) {
-          sibling.parentNode.insertBefore(prevSelected.selection, sibling);
-          prevSelected.selection.scrollIntoView({block: 'nearest'});
-          chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
-        }
+      if (!validSelection()) {
+        return;
+      }
+      const sibling = prevSelected.selection.previousSibling;
+      if (prevSelected.status == 'active' && sibling) {
+        sibling.parentNode.insertBefore(prevSelected.selection, sibling);
+        prevSelected.selection.scrollIntoView({block: 'nearest'});
+        chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
       }
     };
 
     this.swapDown = () => {
-      if (validSelection()) {
-        const sibling = prevSelected.selection.nextSibling;
-        if (prevSelected.status == 'active' && sibling) {
-          sibling.parentNode.insertBefore(sibling, prevSelected.selection);
-          prevSelected.selection.scrollIntoView({block: 'nearest'});
-          chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
-        }
+      if (!validSelection()) {
+        return;
+      }
+      const sibling = prevSelected.selection.nextSibling;
+      if (prevSelected.status == 'active' && sibling) {
+        sibling.parentNode.insertBefore(sibling, prevSelected.selection);
+        prevSelected.selection.scrollIntoView({block: 'nearest'});
+        chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
       }
     };
   }
@@ -137,63 +148,76 @@ function SelectionHandler() {
       }
       return null;
     }
-    if (!settingsOpen()) {
-      if (prevSelected.status == 'active') {
-        if (!prevSelected.savedSelection || (prevSelected.savedSelection 
-            && (!prevSelected.savedSelection.isConnected || prevSelected.savedSelection.style.display == 'none'))) {
-          prevSelected.savedSelection = firstListedShader(savedShaders);
-        }
-        if (prevSelected.savedSelection && prevSelected.savedSelection.isConnected) {
-          prevSelected.savedSelection.scrollIntoView({block: 'nearest'});
-          this.highlight(prevSelected.savedSelection, 'saved');
-        }
+
+    if (overlayPageOpen()) {
+      return;
+    }
+
+    if (prevSelected.status == 'active') {
+      if (!prevSelected.savedSelection || (prevSelected.savedSelection 
+          && (!prevSelected.savedSelection.isConnected || prevSelected.savedSelection.style.display == 'none'))) {
+        prevSelected.savedSelection = firstListedShader(savedShaders);
       }
-      else {
-        if (!prevSelected.activeSelection || (prevSelected.activeSelection 
-            && (!prevSelected.activeSelection.isConnected || prevSelected.activeSelection.style.display == 'none'))) {
-          prevSelected.activeSelection = firstListedShader(activeShaders);
-        }
-        if (prevSelected.activeSelection && prevSelected.activeSelection.isConnected) {
-          prevSelected.activeSelection.scrollIntoView({block: 'nearest'});
-          this.highlight(prevSelected.activeSelection, 'active');
-        }
+      if (prevSelected.savedSelection && prevSelected.savedSelection.isConnected) {
+        prevSelected.savedSelection.scrollIntoView({block: 'nearest'});
+        this.highlight(prevSelected.savedSelection, 'saved');
+      }
+    }
+    else {
+      if (!prevSelected.activeSelection || (prevSelected.activeSelection 
+          && (!prevSelected.activeSelection.isConnected || prevSelected.activeSelection.style.display == 'none'))) {
+        prevSelected.activeSelection = firstListedShader(activeShaders);
+      }
+      if (prevSelected.activeSelection && prevSelected.activeSelection.isConnected) {
+        prevSelected.activeSelection.scrollIntoView({block: 'nearest'});
+        this.highlight(prevSelected.activeSelection, 'active');
       }
     }
   };
 
   this.moveUp = (e) => {
-    if (searchBar != document.activeElement && !settingsOpen()) {
-      e.preventDefault();
-      if (prevSelected.selection) {
-        var sibling = prevSelected.selection.previousSibling;
-      }
-      while (sibling && sibling.style.display == 'none') {
-        sibling = sibling.previousSibling;
-      }
-      if (sibling) {
-        sibling.scrollIntoView({block: 'nearest'});
-        this.highlight(sibling);
-      }
+    if (searchBar == document.activeElement || overlayPageOpen()) {
+      return;
+    }
+
+    e.preventDefault();
+    if (prevSelected.selection) {
+      var sibling = prevSelected.selection.previousSibling;
+    }
+    else {
+      this.switch();
+      return;
+    }
+    while (sibling && sibling.style.display == 'none') {
+      sibling = sibling.previousSibling;
+    }
+    if (sibling) {
+      sibling.scrollIntoView({block: 'nearest'});
+      this.highlight(sibling);
     }
   };
 
   this.moveDown = (e) => {
-    if (searchBar != document.activeElement && !settingsOpen()) {
-      e.preventDefault();
-      if (prevSelected.selection) {
-        var sibling = prevSelected.selection.nextSibling;
-      }
-      else {
-        this.switch();
-        return;
-      }
-      while (sibling && sibling.style.display == 'none') {
-        sibling = sibling.nextSibling;
-      }
-      if (sibling) {
-        sibling.scrollIntoView({block: 'nearest'});
-        this.highlight(sibling);
-      }
+    if (searchBar == document.activeElement || overlayPageOpen()) {
+      return;
+    }
+
+    e.preventDefault();
+    if (prevSelected.selection) {
+      var sibling = prevSelected.selection.nextSibling;
+    }
+    else {
+      prevSelected.status = 'saved';
+      this.switch();
+      prevSelected.status = 'active';
+      return;
+    }
+    while (sibling && sibling.style.display == 'none') {
+      sibling = sibling.nextSibling;
+    }
+    if (sibling) {
+      sibling.scrollIntoView({block: 'nearest'});
+      this.highlight(sibling);
     }
   };
 
@@ -378,7 +402,7 @@ $("#search-bar").on("input", function() {
 
 
 
-function appendButton(iconType, div, tooltip, onClick) {
+function appendButton(iconType, div, tooltip, animate, onClick) {
   const button = document.createElement("span");
   button.classList.add("ui-icon");
   button.classList.add("ui-icon-" + iconType);
@@ -387,13 +411,17 @@ function appendButton(iconType, div, tooltip, onClick) {
   button.addEventListener('mousedown', (e) => {
     e.stopPropagation();
     onClick(div);
-    buttonAnimation(button);
+    if (animate) {
+      buttonAnimation(button);
+    }
   });
   div.appendChild(button);
 }
 
 function deleteAction(div) {
-  removeShader(div.firstChild.innerText);
+  if (confirm("Are you sure you want to permanently delete this program?")) {
+    removeShader(div.firstChild.innerText);
+  }
 }
 
 function addAction(div) {
@@ -409,16 +437,16 @@ function addAction(div) {
 
 function appendSavedButtons(div, inFileSystem) {
   if (!inFileSystem) {
-    appendButton("trash", div, "Delete", deleteAction);
+    appendButton("trash", div, "Delete", false, deleteAction);
   }
 
-  appendButton("script", div, "Edit", function() {
+  appendButton("script", div, "Edit", true, function() {
     chrome.runtime.getBackgroundPage(function(bg) {
       bg.textEdit(div.firstChild.innerText);
     });
   });
 
-  appendButton("circlesmall-plus", div, "Add", addAction);
+  appendButton("circlesmall-plus", div, "Add", true, addAction);
 }
 
 function cloneAction(div) {
@@ -440,8 +468,8 @@ function removeAction(div) {
 }
 
 function appendActiveButtons(div) {
-  appendButton("copy", div, "Clone", cloneAction);
-  appendButton("circlesmall-minus", div, "Remove", removeAction);
+  appendButton("copy", div, "Clone", true, cloneAction);
+  appendButton("circlesmall-minus", div, "Remove", true, removeAction);
 }
 
 function buttonAnimation(item) {
@@ -534,8 +562,6 @@ $("#active-shaders").sortable({
     updateAnimation(ui.item.context);
   }
 });
-
-$("#table-container").disableSelection();
 
 chrome.runtime.getBackgroundPage(function(bg) {
   bg.readRemLoad(refreshShaderList);

@@ -1,27 +1,30 @@
 let generation;
 const defaultText = 
-`precision mediump float;
+`#version 300 es
+precision mediump float;
 
 uniform vec2 resolution;
-uniform sampler2D texture;
+uniform sampler2D frame;
+
+out vec4 fragColor;
 
 void main(void) {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
-  gl_FragColor = texture2D(texture, uv);
+  fragColor = texture(frame, uv);
 }`;
 
 
 const mirrorContainer = document.createElement('div');
-mirrorContainer.id = 'shaderbliss-panel';
+mirrorContainer.id = 'shadervision-panel';
 mirrorContainer.style.display = 'none';
 mirrorContainer.tabIndex = 0;
 
 const header = document.createElement('div');
-header.id = 'shaderbliss-header';
+header.id = 'shadervision-header';
 mirrorContainer.appendChild(header);
 
 const nameElement = document.createElement('span');
-nameElement.id = 'shaderbliss-filename';
+nameElement.id = 'shadervision-filename';
 nameElement.contentEditable = true;
 nameElement.spellcheck = false;
 nameElement.style.cursor = 'default';
@@ -47,19 +50,19 @@ nameElement.addEventListener('focusout', () => {
 header.appendChild(nameElement);
 
 const savedStatus = document.createElement('span');
-savedStatus.id = 'shaderbliss-savedstatus';
+savedStatus.id = 'shadervision-savedstatus';
 savedStatus.innerText = "";
 savedStatus.style.cursor = 'default';
 header.appendChild(savedStatus);
 
 const readOnlyStatus = document.createElement('span');
-readOnlyStatus.id = 'shaderbliss-readonlystatus';
+readOnlyStatus.id = 'shadervision-readonlystatus';
 readOnlyStatus.innerText = "";
 readOnlyStatus.style.cursor = 'default';
 header.appendChild(readOnlyStatus);
 
 const closeIcon = document.createElement('img');
-closeIcon.id = 'shaderbliss-close';
+closeIcon.id = 'shadervision-close';
 closeIcon.src = chrome.runtime.getURL("images/close16.png");
 header.appendChild(closeIcon);
 

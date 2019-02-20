@@ -4,13 +4,21 @@
     <link rel="stylesheet" type="text/css" href="lib/jquery/jquery-ui.css">
     <link rel="stylesheet" type="text/css" href="popup.css">
     <link rel="stylesheet" type="text/css" href="options.css">
+    <link rel="stylesheet" type="text/css" href="textures.css">
   </head>
 
   <body>
     <div id="menu">
       <span id="menu-new-shader" class="ui-icon ui-icon-document menu-icon" title="New shader"></span>
+      <span id="menu-textures" class="ui-icon ui-icon-image menu-icon" title="Textures"></span>
       <span id="menu-options" class="ui-icon ui-icon-gear menu-icon" title="Settings"></span>
       <!--<span id="help" class="ui-icon ui-icon-help menu-icon" title="Help"></span>-->
+    </div>
+
+    <div id="textures-surroundings"></div>
+    <div id="textures-page">
+      <span id="textures-close" class="ui-icon ui-icon-close" title="Close"></span>
+      <div id="textures-header">Textures</div>
     </div>
 
     <div id="options-surroundings"></div>
@@ -101,6 +109,7 @@
 
   <script src="lib/jquery/jquery-1.12.4.min.js"></script>
   <script src="lib/jquery/jquery-ui.min.js"></script>
+  <script src="textures.js"></script>
   <script src="options.js"></script>
   <script src="popup.js"></script>
 

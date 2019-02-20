@@ -1,0 +1,78 @@
+#textures-page {
+  position: absolute;
+  z-index: 1;
+  display: none;
+  width: 60%;
+  height: 60%;
+  top: 15px;
+  left: 32px;
+  background-color: white;
+  box-shadow: 0 0 3px 1px white;
+}
+
+#textures-close {
+  float: right;
+}
+
+#textures-header {
+  padding-left: 2px;
+  font-size: 11px;
+  border-bottom: 1px solid black;
+  cursor: default;
+  background-color: lightgrey;
+}
+
+#textures-surroundings {
+  position: absolute;
+  z-index: 1;
+  display: none;
+  height: 100%;
+  width: 288px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 40%);
+}
+
+#preview-container {
+  margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  position: absolute;
+  justify-content: center;
+}
+
+.preview-wrapper {
+  width: 70px;
+  height: 54px;
+  margin: 4px;
+  padding: 4px;
+  font-style: italic;
+  background-color: lightgrey;
+  position: relative;
+}
+
+.preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.preview-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.tex-num {
+  font-size: 11px;
+  padding-bottom: 3px;
+  cursor: default;
+}
+
+.drop-hover {
+  background-color: hsla(155, 90%, 55%, 35%);
+}
