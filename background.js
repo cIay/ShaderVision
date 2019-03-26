@@ -71,11 +71,11 @@ function fetchDataURL(url, callback) {
   xhr.send();
 }
 
-// Store the image in the first texture slot, pushing down any existing textures
+// store the image in the first texture slot, pushing down any existing textures
 function storeTexture(dataUrl) {
   chrome.storage.local.get(['textures'], function(result) {
     if (!result.textures) {
-      result.textures = {};
+      result.textures = [];
     }
     const len = result.textures.length;
     let cur, prev = dataUrl;
@@ -152,6 +152,9 @@ function storeShader(name, contents, sendResponse) {
 function applyShaders(shaders) {
   chrome.tabs.query({active:true, currentWindow: true}, function(tabs) {
     chrome.tabs.sendMessage(tabs[0].id, {target: 'canvas', ping: true}, function(response) {
+      if (chrome.runtime.lastError) {
+      //console.log(chrome.runtime.lastError);
+      }
 
       function activate(shaders) {
         if (!response) {
@@ -180,6 +183,9 @@ function applyShaders(shaders) {
 function textEdit(shaderFile) {
   chrome.tabs.query({active:true, currentWindow: true}, function(tabs) {
     chrome.tabs.sendMessage(tabs[0].id, {target: 'editor', ping: true}, function(response) {
+      if (chrome.runtime.lastError) {
+      //console.log(chrome.runtime.lastError);
+      }
       if (!response) {
         styleChain(editStyling, function() {
           executeChain(editScripts, function() {
@@ -194,25 +200,31 @@ function textEdit(shaderFile) {
   });
 }
 
-function sendShaders(targetTab, targetScript, fileList) {
+function sendShaders(targetTab, targetScript, toSend) {
   const shaderObj = {
     names: [],
     contents: [],
-    readOnlyFlags: []
+    readOnlyFlags: [],
+    bufNums: []
   };
+  const fileList = [];
 
-  let query;
-  let noActiveShaders = false;
-  if (!fileList || fileList.length == 0) {
-    noActiveShaders = true;
-    query = ['settings', 'textures'];
+  if (!toSend || toSend.length == 0) { // new file to edit
+    var noActiveShaders = true;
+    var query = ['settings', 'textures'];
   }
   else {
-    if (!Array.isArray(fileList)) {
-      fileList = [fileList];
+    if (!Array.isArray(toSend)) { // existing file to edit
+      fileList.push(toSend);
+      toSend = [toSend];
     }
-
-    query = Array.from(new Set(fileList));
+    else {
+      toSend.forEach(function(item) {
+        fileList.push(item.name);
+      });
+    }
+    var noActiveShaders = false;
+    var query = Array.from(new Set(fileList));
     query.push('settings');
     query.push('textures');
     query.push('savedShaders');
@@ -231,20 +243,21 @@ function sendShaders(targetTab, targetScript, fileList) {
       }
 
       if (noActiveShaders) {
-        //TODO: write getNewFilename() which appends an incrementing number to the 'New Shader' name
         sendMessage();
+        return;
       }
-      else {
-        fileList.forEach(function(name) {
-          // check if the file exists
-          if (result.savedShaders[name]) {
-            shaderObj.names.push(name);
-            shaderObj.contents.push(result[name].text);
-            shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
-          }
-        });
-        sendMessage();
-      }
+
+      toSend.forEach(function(item) {
+        const name = (item.name) ? item.name : item;
+        // check if the file exists
+        if (result.savedShaders[name]) {
+          shaderObj.names.push(name);
+          shaderObj.contents.push(result[name].text);
+          shaderObj.readOnlyFlags.push(result.savedShaders[name].inFileSystem);
+          shaderObj.bufNums.push((item.bufNum) ? item.bufNum-1 :  null); // subtract 1 for 0 based indexing
+        }
+      });
+      sendMessage();
     });
   });
 }
@@ -294,9 +307,7 @@ function readDirectory(directory, callback) {
 
 function removeFiles(entries, callback) {
   chrome.storage.local.get(['savedShaders'], function(result) {
-    //console.log(result);
-
-    let markedForRemoval = [];
+    const markedForRemoval = [];
     let savedShaders = {}
     if (result.savedShaders) {
       savedShaders = result.savedShaders;

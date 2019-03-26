@@ -225,6 +225,17 @@ body {
   justify-content: flex-end;
 }
 
+.buffer-icon {
+  width: 16px;
+  height: 16px;
+  text-align: center;
+  font-size: 9px;
+  outline: 1px solid dimgrey;
+  outline-offset: -4px;
+  line-height: 1.8;
+  font-family: monospace;
+}
+
 .ui-draggable-dragging, .name {
 }
 

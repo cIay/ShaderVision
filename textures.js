@@ -49,17 +49,21 @@ document.getElementById("textures-close").addEventListener('click', function() {
   texPage.appendChild(previewContainer);
 }());
 
+
 chrome.storage.local.get(['textures'], function(result) {
-  if (result.textures) {
-    const wrappers = document.getElementsByClassName("preview-wrapper");
-    for (let i = 0; i < wrappers.length; i++) {
-      if (result.textures[i]) {
-        const newImage = document.createElement('img');
-        newImage.className = "preview";
-        newImage.src = result.textures[i]
-        makeImageDraggable(newImage);
-        wrappers[i].appendChild(newImage);
-      }
+  if (!result.textures) {
+    chrome.storage.local.set({textures: []});
+    return;
+  }
+
+  const wrappers = document.getElementsByClassName("preview-wrapper");
+  for (let i = 0; i < wrappers.length; i++) {
+    if (result.textures[i]) {
+      const newImage = document.createElement('img');
+      newImage.className = "preview";
+      newImage.src = result.textures[i]
+      makeImageDraggable(newImage);
+      wrappers[i].appendChild(newImage);
     }
   }
 });

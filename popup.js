@@ -1,3 +1,4 @@
+const numBuffers = 3;
 //document.getElementById("icon").addEventListener('click', function() {
 //});
 
@@ -19,11 +20,17 @@ document.getElementById("menu-new-shader").addEventListener('click', function() 
   });
 });
 
-function createShaderList(id) {
+function createShaderList() {
+  const id = "active-shaders";
   const shaderList = [];
-  const shaderElements = document.getElementById(id);
-  for (let i = 0; i < shaderElements.children.length; i++) {
-    shaderList.push(shaderElements.children[i].innerText);
+  const shaderElements = document.getElementById(id).children;
+  for (let i = 0; i < shaderElements.length; i++) {
+    const shaderName = shaderElements[i].firstChild.innerText;
+    const bufNum = Number(shaderElements[i].children[1].innerText);
+    shaderList[i] = {
+      name: shaderName,
+      bufNum: (bufNum) ? bufNum : null
+    }
   }
   return shaderList;
 }
@@ -64,12 +71,35 @@ function SelectionHandler() {
               prevSelected.selection.isConnected);
     }
 
+    this.find = (character) => {
+      if (searchBar == document.activeElement || overlayPageOpen()) {
+        return;
+      }
+      if (prevSelected.status != 'active') {
+        for (let i = 0; i < savedShaders.length; i++) {
+          if (savedShaders[i].style.display != 'none') {
+            const firstLetter = savedShaders[i].firstChild.innerText[0].toLowerCase();
+            if (firstLetter >= character) {
+              savedShaders[i].scrollIntoView({block: 'nearest'});
+              handler.highlight(savedShaders[i]);
+              return;
+            }
+          }
+        }
+      }
+    };
+
     this.run = () => {
       if (!validSelection()) {
         return;
       }
       chrome.runtime.getBackgroundPage(function(bg) {
-        bg.applyShaders([prevSelected.selection.firstChild.innerText]);
+        const shaderName = prevSelected.selection.firstChild.innerText;
+        const bufNum = Number(prevSelected.selection.children[1].innerText);
+        bg.applyShaders([{
+          name: shaderName,
+          bufNum: (bufNum) ? bufNum : null
+        }]);
       });
     };
 
@@ -91,12 +121,9 @@ function SelectionHandler() {
         return;
       }
 
-      if (prevSelected.selection.nextSibling) {
-        var sibling = prevSelected.selection.nextSibling;
-      }
-      else {
-        var sibling = prevSelected.selection.previousSibling;
-      }
+      const next = prevSelected.selection.nextSibling;
+      const prev = prevSelected.selection.previousSibling;
+      const sibling = (next) ? next : prev;
 
       removeAction(prevSelected.selection);
       /*
@@ -119,7 +146,7 @@ function SelectionHandler() {
       if (prevSelected.status == 'active' && sibling) {
         sibling.parentNode.insertBefore(prevSelected.selection, sibling);
         prevSelected.selection.scrollIntoView({block: 'nearest'});
-        chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+        chrome.storage.local.set({activeShaders: createShaderList()});
       }
     };
 
@@ -131,9 +158,22 @@ function SelectionHandler() {
       if (prevSelected.status == 'active' && sibling) {
         sibling.parentNode.insertBefore(sibling, prevSelected.selection);
         prevSelected.selection.scrollIntoView({block: 'nearest'});
-        chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+        chrome.storage.local.set({activeShaders: createShaderList()});
       }
     };
+
+    this.incrementBufNum = () => {
+      if (!validSelection()) {
+        return;
+      }
+      incrementAction(prevSelected.selection);
+    }
+    this.decrementBufNum = () => {
+      if (!validSelection()) {
+        return;
+      }
+      decrementAction(prevSelected.selection);
+    }
   }
 
   this.selectedControls = new SelectedControls(this);
@@ -252,6 +292,11 @@ function SelectionHandler() {
 let selectionHandler = new SelectionHandler();
 
 document.addEventListener('keydown', (e) => {
+
+  if (e.key >= 'a' && e.key <= 'z' && !e.ctrlKey && !e.altKey) {
+    selectionHandler.selectedControls.find(e.key);
+  }
+
   switch (e.key) {
     case 'Tab':
       selectionHandler.switch();
@@ -283,6 +328,14 @@ document.addEventListener('keydown', (e) => {
       }
       break;
 
+    case 'ArrowRight':
+      selectionHandler.selectedControls.incrementBufNum();
+      break;
+
+    case 'ArrowLeft':
+      selectionHandler.selectedControls.decrementBufNum();
+      break;
+
     case 'Enter':
       selectionHandler.selectedControls.add();
       break;
@@ -303,14 +356,17 @@ document.addEventListener('keydown', (e) => {
 });
 
 
-function addShader(shaders, sibling, name, inFileSystem, appendButtons) {
+function addShader(shaders, sibling, name, inFileSystem, bufNum, appendButtons) {
 
   const newShader = document.createElement("div");
   const textWrapper = document.createElement("span");
   textWrapper.classList.add("name");
   textWrapper.appendChild(document.createTextNode(name));
   newShader.appendChild(textWrapper);
-  appendButtons(newShader, inFileSystem);
+  if (inFileSystem)
+    appendButtons(newShader, inFileSystem);
+  else
+    appendButtons(newShader, bufNum);
 
   newShader.classList.add("shader");
   if (shaders.id == "active-shaders") {
@@ -318,7 +374,10 @@ function addShader(shaders, sibling, name, inFileSystem, appendButtons) {
     newShader.classList.add("ui-sortable-handle");
   }
 
-  newShader.addEventListener('mousedown', function() {
+  newShader.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) { // left click only
+      return;
+    }
     selectionHandler.highlight(newShader, shaders.id.split("-")[0]);
   });
 
@@ -351,14 +410,19 @@ function refreshShaderList() {
       shaderElements.removeChild(shaderElements.firstChild);
     }
 
-    Object.keys(result.savedShaders).forEach(function(name) {
+    const keys = Object.keys(result.savedShaders).sort(function(a, b) {
+      // case insensitive sort
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    keys.forEach(function(name) {
       if (result.settings.hideReadOnly && result.savedShaders[name].inFileSystem) {
         // pass since the file is in the filesystem and the hide read-only checkbox is on
       }
       else {
         addShader(shaderElements, null, name,
-                  result.savedShaders[name].inFileSystem, 
-                  appendSavedButtons);
+                  result.savedShaders[name].inFileSystem,
+                  null, appendSavedButtons);
       }
     });
 
@@ -402,14 +466,23 @@ $("#search-bar").on("input", function() {
 
 
 
-function appendButton(iconType, div, tooltip, animate, onClick) {
+function appendButton(iconType, div, tooltip, animate, onClick, bufNum) {
   const button = document.createElement("span");
-  button.classList.add("ui-icon");
-  button.classList.add("ui-icon-" + iconType);
+  if (!iconType) {
+    button.innerText = (bufNum) ? bufNum : '';
+    button.classList.add("buffer-icon");
+  }
+  else {
+    button.classList.add("ui-icon");
+    button.classList.add("ui-icon-" + iconType);
+  }
   button.classList.add("shader-icon");
   button.title = tooltip;
   button.addEventListener('mousedown', (e) => {
     e.stopPropagation();
+    if (e.button !== 0) { // left click only
+      return;
+    }
     onClick(div);
     if (animate) {
       buttonAnimation(button);
@@ -426,11 +499,9 @@ function deleteAction(div) {
 
 function addAction(div) {
   let newItem = addShader(document.getElementById("active-shaders"),
-                          null, 
-                          div.firstChild.innerText,
-                          null,
-                          appendActiveButtons);
-  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+                          null, div.firstChild.innerText,
+                          null, null, appendActiveButtons);
+  chrome.storage.local.set({activeShaders: createShaderList()});
   updateAnimation(newItem);
   newItem.scrollIntoView(false);
 }
@@ -451,11 +522,9 @@ function appendSavedButtons(div, inFileSystem) {
 
 function cloneAction(div) {
   let clonedItem = addShader(document.getElementById("active-shaders"), 
-                             div,
-                             div.firstChild.innerText,
-                             null,
-                             appendActiveButtons);
-  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+                             div, div.firstChild.innerText,
+                             null, null, appendActiveButtons);
+  chrome.storage.local.set({activeShaders: createShaderList()});
   updateAnimation(clonedItem);
 }
 
@@ -464,10 +533,30 @@ function removeAction(div) {
     addEmptyMessage(div.parentElement);
   }
   div.parentElement.removeChild(div);
-  chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+  chrome.storage.local.set({activeShaders: createShaderList()});
 }
 
-function appendActiveButtons(div) {
+function incrementAction(div) {
+  const bufButton = div.children[1];
+  const bufNum = Number(bufButton.innerText);
+  bufButton.innerText = (bufNum == numBuffers) ? '' : bufNum + 1;
+  chrome.storage.local.set({activeShaders: createShaderList()});
+}
+
+function decrementAction(div) {
+  const bufButton = div.children[1];
+  const bufNum = Number(bufButton.innerText);
+  if (bufNum == 1)
+    bufButton.innerText = '';
+  else if (bufNum == 0)
+    bufButton.innerText = numBuffers;
+  else
+    bufButton.innerText = bufNum - 1;
+  chrome.storage.local.set({activeShaders: createShaderList()});
+}
+
+function appendActiveButtons(div, bufNum) {
+  appendButton(null, div, "Buffer", true, incrementAction, bufNum);
   appendButton("copy", div, "Clone", true, cloneAction);
   appendButton("circlesmall-minus", div, "Remove", true, removeAction);
 }
@@ -486,22 +575,24 @@ function updateAnimation(item) {
 
 (function retrieveActiveShaders() {
   chrome.storage.local.get(['activeShaders'], function(result) {
+    console.log(result);
     if (!result.activeShaders) {
       chrome.storage.local.set({activeShaders: []});
       return;
     }
-    const shaderElement = document.getElementById("active-shaders");
+
+    const shaderElements = document.getElementById("active-shaders");
     if (result.activeShaders.length == 0) {
-      addEmptyMessage(shaderElement);
+      addEmptyMessage(shaderElements);
+      return;
     }
-    else {
-      while (shaderElement.firstChild) {
-        shaderElement.removeChild(shaderElement.firstChild);
-      }
-      result.activeShaders.forEach(function(name) {
-        addShader(shaderElement, null, name, null, appendActiveButtons);
-      });
+
+    while (shaderElements.firstChild) {
+      shaderElements.removeChild(shaderElements.firstChild);
     }
+    result.activeShaders.forEach(function(item) {
+      addShader(shaderElements, null, item.name, null, item.bufNum, appendActiveButtons);
+    });
   });
 })();
 
@@ -558,7 +649,7 @@ $("#active-shaders").sortable({
         selectionHandler.highlight(ui.item.context, "active-shaders");
       });
     }
-    chrome.storage.local.set({activeShaders: createShaderList("active-shaders")});
+    chrome.storage.local.set({activeShaders: createShaderList()});
     updateAnimation(ui.item.context);
   }
 });

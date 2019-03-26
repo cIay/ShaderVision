@@ -1,13 +1,14 @@
 let fragShaders = null;
 let flags = {
   execNewShaders: false,
+  killProgram: false,
   resetFBO: false,
   resetAudio: false,
   takeScreenshot: false
 };
 let state = {
-  audioSource: null, // 'video', 'mic', 'none'
-  mediaType: null // 'video', 'image'
+  audioSource: null, // 'video', 'mic', or 'none'
+  mediaType: null // 'video' or 'image'
 }
 
 if (document.readyState == 'loading') {
@@ -66,6 +67,21 @@ function main() {
     elements.media = elements.image;
   }
 
+
+  function testOrigin(media) {
+    const pageOrigin = location.origin;
+    const sourceOrigin = (media.currentSrc) ? (new URL(media.currentSrc)).origin : null;
+    if (pageOrigin == 'file://' && state.mediaType == 'video')
+      return false;
+    else
+      return pageOrigin == sourceOrigin;
+  }
+
+  if (!testOrigin(elements.media)) {
+    chrome.runtime.sendMessage({tabUrl: elements.media.currentSrc});
+    return;
+  }
+
   initCanvas(elements);
 
   const gl = elements.canvas.getContext('webgl2', {
@@ -76,6 +92,7 @@ function main() {
     alert('ShaderVision: Unable to initialize WebGL. Your browser or machine may not support it.'); 
     return;
   }
+  //gl.hint(); gl.getParameter();
 
   let recorder = new Recorder(elements.canvas);
   let audio = new AudioProcessor();
@@ -90,18 +107,27 @@ function main() {
 
   document.addEventListener('keydown', (e) => {
     if (e.altKey) {
-      if (e.key == 'r') {
-        if (fragShaders) {
-          recorder.toggleRecording();
-        }
-      }
-      else if (e.key == 's') {
-        if (fragShaders) {
-          flags.takeScreenshot = true;
-        }
-      }
-      else if (e.key == 'a') {
-        chrome.runtime.sendMessage({requestShaders: true});
+      switch (e.key) {
+        case 'r':
+          if (fragShaders) {
+            recorder.toggleRecording();
+          }
+          break;
+
+        case 's':
+          if (fragShaders) {
+            flags.takeScreenshot = true;
+          }
+          break;
+
+        case 'k':
+          if (fragShaders) {
+            flags.killProgram = true;
+          }
+          break;
+
+        case 'a':
+          chrome.runtime.sendMessage({requestShaders: true});
       }
     }
   });
@@ -113,73 +139,130 @@ function main() {
 
     if (request.ping) {
       sendResponse({pong: true});
+      return;
     }
-    else if (request.shaders && request.settings) {
-      applySettings(request.settings, audio, recorder);
-      initMediaStream(elements, audio, recorder);
 
-      if (fragShaders === null) {
-        showCanvas(elements);
-        hideMedia(elements);
-        fragShaders = request.shaders.contents;
-        execShaders(gl, request.settings, request.textures, elements, audio, recorder);
-      }
-      else {
-        flags.execNewShaders = true;
-        // wait for previous render loop to return
-        (function waitThenExecute() {
-          if (flags.execNewShaders) {
-            setTimeout(waitThenExecute, 50);
-          }
-          else {
-            fragShaders = request.shaders.contents;
-            execShaders(gl, request.settings, request.textures, elements, audio, recorder);
-          }
-        })();
-      }
+    if (!request.shaders || !request.settings) {
+      return;
+    }
+
+    console.log(request);
+
+    applySettings(request.settings, audio, recorder);
+    initMediaStream(elements, audio, recorder);
+
+    const bufferInfo = initBufferInfo(request.shaders.bufNums);
+  
+    console.log(bufferInfo);
+
+    if (fragShaders === null) {
+      showCanvas(elements);
+      hideMedia(elements);
+      fragShaders = request.shaders.contents;
+      execShaders(gl, request.settings, request.textures, bufferInfo,
+                  elements, audio, recorder);
+    }
+    else {
+      flags.execNewShaders = true;
+      // wait for previous render loop to return
+      (function waitThenExecute() {
+        if (flags.execNewShaders) {
+          setTimeout(waitThenExecute, 50);
+        }
+        else {
+          fragShaders = request.shaders.contents;
+          execShaders(gl, request.settings, request.textures, bufferInfo,
+                      elements, audio, recorder);
+        }
+      })();
     }
   });
 }
 
 
-function execShaders(gl, settings, textures, elements, audio, recorder) {
+function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder) {
   console.log("ShaderVision: Running...");
+  const fps = null;
+  const mipmapsFlag = false;
+  const maxRenders = 1;
+  const textureUnitMap = {
+    frame: 0,
+    prevFrame: 1,
+    firstFrame: 2,
+    freqData: 3,
+    timeData: 4,
+    tex: 5,
+    buf: 5+images.length
+  };
 
-  function endProgram() {
+  function endProgram(options) {
     fragShaders = null;
-    showMedia(elements);
-    hideCanvas(elements);
+    if (options) {
+      if (options.showMedia)
+        showMedia(elements);
+      if (options.hideCanvas)
+        hideCanvas(elements);
+      if (options.removeCanvas)
+        removeCanvas(elements);
+    }
     console.log("ShaderVision: Dead");
   }
-  const programInfo = initPrograms(gl, textures.length);
+  setDimensions(elements);
+
+  const programInfo = initPrograms(gl, images.length, bufferInfo);
   if (programInfo === null) {
-    endProgram();
+    endProgram({showMedia: true, hideCanvas: true});
     return;
   }
+  initVertexArray(gl, programInfo);
 
-  let mouseCoords = {x: 0.0, y: 0.0};
-  initMouseListener(elements, mouseCoords);
+  const uniforms = {
+    mouse: {x: 0.0, y: 0.0},
+    bass: 0,
+    avgBass: 0,
+    mid: 0,
+    avgMid: 0,
+    treb: 0,
+    avgTreb: 0,
+    energy: 0,
+    avgEnergy: 0,
+    time: 0,
+    deltaTime: 0,
+    frameCount: 0
+  };
+  initMouseListener(elements, uniforms.mouse);
 
-  const buffer = initBuffer(gl);
-  const texture = initTexture(gl);
+  gl.activeTexture(gl.TEXTURE0);
+  const minification = (mipmapsFlag) ? gl.NEAREST_MIPMAP_LINEAR : null;
+  const frameTextures = [initTexture(gl, minification), 
+                         initTexture(gl, minification)];
   const freqTexture = initTexture(gl); 
   const timeTexture = initTexture(gl);
-  let pingPongData = initFboPingPong(gl, programInfo);
 
-  initImageTextures(gl, textures);
-  
+  let pingPongData = initFramebuffers(gl, programInfo, 2);
+  let bufferData = initFramebuffers(gl, programInfo, bufferInfo.numBuffers*2);
   flags.resetFBO = false;
 
-  const elapsed = performance.now();
+  initImageTextures(gl, images, textureUnitMap, mipmapsFlag);
+  
   let prevTime = 0.0;
-  let frameCount = 0;
-
   // Draw the scene repeatedly
-  function render(time) {
-    time -= elapsed;
-    time *= 0.001;  // convert to seconds
-    const deltaTime = time - prevTime;
-    prevTime = time;
+  function render() {
+    uniforms.time = performance.now();
+    uniforms.time *= 0.001;  // convert to seconds
+    uniforms.deltaTime = uniforms.time - prevTime;
+    prevTime = uniforms.time;
+
+    if (maxRenders && maxRenders <= uniforms.frameCount) {
+      endProgram();
+      return;
+    }
+
+    if (flags.killProgram) {
+      flags.killProgram = false;
+      endProgram({showMedia: true, hideCanvas: true});
+      return;
+    }
 
     if (flags.execNewShaders) {
       clearScene(gl);
@@ -189,7 +272,8 @@ function execShaders(gl, settings, textures, elements, audio, recorder) {
 
     if (flags.resetFBO) {
       //console.log("resetFBO");
-      pingPongData = initFboPingPong(gl, programInfo);
+      pingPongData = initFramebuffers(gl, programInfo, 2);
+      bufferData = initFramebuffers(gl, programInfo, bufferInfo.numBuffers*2);
       flags.resetFBO = false;
     }
 
@@ -199,51 +283,46 @@ function execShaders(gl, settings, textures, elements, audio, recorder) {
       flags.resetAudio = false;
     }
 
-    updateAudio(gl, freqTexture, timeTexture, audio);
-    const low = audio.sumSubBand(0, 300);
-    const mid = audio.sumSubBand(300, 4000);
-    const high = audio.sumSubBand(4000, (audio.context.sampleRate / 2));
-    const total = audio.sumSubBand(0, (audio.context.sampleRate / 2));
-    audio.pushAllEnergy(low, mid, high, total);
+    updateAudio(gl, freqTexture, timeTexture, audio, textureUnitMap, uniforms);
 
-    if (!updateTexture(gl, texture, elements.media)) {
-      if (elements.media.currentSrc) {
-        chrome.runtime.sendMessage({tabUrl: elements.media.currentSrc});
-      }
-      endProgram();
+    if (!updateTexture(gl, frameTextures[uniforms.frameCount%2], elements.media, mipmapsFlag)) {
+      //if (elements.media.currentSrc)
+        //chrome.runtime.sendMessage({tabUrl: elements.media.currentSrc});
+      endProgram({showMedia: true, removeCanvas: true});
       return;
     }
+    // update prevFrame
+    gl.activeTexture(gl.TEXTURE0+textureUnitMap['prevFrame']);
+    gl.bindTexture(gl.TEXTURE_2D, frameTextures[(uniforms.frameCount+1)%2]);
+    // update firstFrame
+    gl.activeTexture(gl.TEXTURE0+textureUnitMap['firstFrame']);
+    gl.bindTexture(gl.TEXTURE_2D, frameTextures[uniforms.frameCount%2]);
 
-    const uniforms = {
-      mouse: mouseCoords,
-      bass: low,
-      avgBass: audio.averageEnergyHistory(audio.lowHistory),
-      mid: mid,
-      avgMid: audio.averageEnergyHistory(audio.midHistory),
-      treb: high,
-      avgTreb: audio.averageEnergyHistory(audio.highHistory),
-      energy: total,
-      avgEnergy: audio.averageEnergyHistory(audio.totalHistory),
-      time: time,
-      deltaTime: deltaTime,
-      frameCount: frameCount
-    };
-    drawScene(gl, programInfo, buffer, pingPongData, uniforms, textures.length);
+
+    drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferInfo, textureUnitMap);
+
 
     if (flags.takeScreenshot) {
       recorder.takeScreenshot();
       flags.takeScreenshot = false;
     }
     
-    frameCount++;
+    uniforms.frameCount++;
 
-    requestAnimationFrame(render);
+    if (fps)
+      setTimeout(render, 1000/fps);
+    else
+      requestAnimationFrame(render);
   }
-  requestAnimationFrame(render);
+
+  if (fps)
+    render();
+  else
+    requestAnimationFrame(render);
 }
 
-function initBuffer(gl) {
-  buffer = gl.createBuffer();
+function initVertexArray(gl, programInfo) {
+  const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   const positions = [-1.0, -1.0, 
                       1.0, -1.0, 
@@ -251,71 +330,111 @@ function initBuffer(gl) {
                       1.0, -1.0, 
                       1.0, 1.0, 
                       -1.0, 1.0];
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW );
-  return buffer;
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+  for (let i = 0; i < programInfo.length; i++) {
+    gl.vertexAttribPointer(programInfo[i].attribLocations.vertexPosition,
+                           2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo[i].attribLocations.vertexPosition);
+  }
 }
 
 
-function initTexture(gl) {
+function initTexture(gl, minification, wrap) {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  if (!wrap) {
+    wrap = gl.REPEAT;//gl.MIRRORED_REPEAT;
+  }
+  if (!minification) {
+    minification = gl.LINEAR;
+  }
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minification);
 
   return texture;
 }
 
-function initImageTextures(gl, textures) {
-  if (!textures) {
+function initImageTextures(gl, images, textureUnitMap, mipmapsFlag) {
+  if (!images) {
     return;
   }
-  for (let i = 0; i < textures.length; i++) {
+  const minification = (mipmapsFlag) ? gl.NEAREST_MIPMAP_LINEAR : null;
+  for (let i = 0; i < images.length; i++) {
+    if (!images[i]) {
+      continue;
+    }
     const img = new Image();
-    img.src = textures[i];
+    img.src = images[i];
     img.addEventListener('load', function() {
-      gl.activeTexture(gl.TEXTURE3+i);
-      gl.bindTexture(gl.TEXTURE_2D, initTexture(gl));
+      gl.activeTexture(gl.TEXTURE0+textureUnitMap['tex']+i);
+      initTexture(gl, minification);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.activeTexture(gl.TEXTURE0);
+      if (mipmapsFlag)
+        gl.generateMipmap(gl.TEXTURE_2D);
     });
   }
 }
 
-function initFboPingPong(gl, programInfo) {
-  if (programInfo.length == 1) {
-    return null;
+function initBufferInfo(bufferList) {
+  //const bufferList = new Array(fragShaders.length);
+  //bufferList.fill(null);
+  //bufferList[0] = 0; bufferList[1] = 1; bufferList[2] = 2; 
+  const bufferMap = new Map();
+  const bufferMapKeys = [];
+  for (let i = 0; i < bufferList.length; i++) {
+    if (bufferList[i] !== null) {
+      //bufferMap[bufferList[i]] = i;
+      bufferMap.set(bufferList[i], i);
+      bufferMapKeys.push(bufferList[i]);
+    }
   }
+  //const bufferMapKeys = Object.keys(bufferMap);
+  const numBuffers = bufferMapKeys.length;
+  return {
+    bufferList: bufferList,
+    bufferMap: bufferMap,
+    bufferMapKeys: bufferMapKeys,
+    numBuffers: numBuffers
+  };
+}
 
-  const pingPongData = {
+function initFramebuffers(gl, programInfo, numBuffers) {
+
+  const fboData = {
     textures: [],
     framebuffers: []
   };
-  for (let i = 0; i < 2; i++) {
+
+  for (let i = 0; i < numBuffers; i++) {
+
     const texture = initTexture(gl);
-    pingPongData.textures.push(texture);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA,
                   gl.canvas.width, gl.canvas.height, 0,
                   gl.RGBA, gl.UNSIGNED_BYTE, null);
+    fboData.textures.push(texture);
+
     const fbo = gl.createFramebuffer();
-    pingPongData.framebuffers.push(fbo);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    fboData.framebuffers.push(fbo);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, 
                             gl.TEXTURE_2D, texture, 0);
   }
 
-  return pingPongData;
+  return fboData;
 }
 
 
 // Copy the video/image texture
-function updateTexture(gl, texture, media) {
+function updateTexture(gl, texture, media, mipmapsFlag) {
   const level = 0;
   const internalFormat = gl.RGBA;
   const srcFormat = gl.RGBA;
   const srcType = gl.UNSIGNED_BYTE;
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   if (media.nodeName == 'VIDEO' && media.readyState < 3) {
     return true;
@@ -323,6 +442,8 @@ function updateTexture(gl, texture, media) {
   try {
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   srcFormat, srcType, media);
+    if (mipmapsFlag)
+      gl.generateMipmap(gl.TEXTURE_2D);
   }
   catch (err) {
     console.log(err);
@@ -331,11 +452,21 @@ function updateTexture(gl, texture, media) {
   return true;
 }
 
-function updateAudio(gl, freqTexture, timeTexture, audio) {
+function updateAudio(gl, freqTexture, timeTexture, audio, textureUnitMap, uniforms) {
   if (state.audioSource == 'video' || state.audioSource == 'mic') {
     audio.analyser.getByteFrequencyData(audio.frequencyData);
     audio.analyser.getByteTimeDomainData(audio.timeDomainData);
     audio.instantAnalyser.getByteFrequencyData(audio.instantFrequencyData);
+
+    uniforms.bass = audio.sumSubBand(0, 300);
+    uniforms.mid = audio.sumSubBand(300, 4000);
+    uniforms.treb = audio.sumSubBand(4000, audio.nyquist);
+    uniforms.energy = audio.sumSubBand(0, audio.nyquist);
+    audio.pushAllEnergy(uniforms.bass, uniforms.mid, uniforms.treb, uniforms.energy);
+    uniforms.avgBass = audio.averageEnergyHistory(audio.lowHistory);
+    uniforms.avgMid = audio.averageEnergyHistory(audio.midHistory);
+    uniforms.avgTreb = audio.averageEnergyHistory(audio.highHistory);
+    uniforms.avgEnergy = audio.averageEnergyHistory(audio.totalHistory);
   }
   else {
     audio.frequencyData.fill(0);
@@ -343,17 +474,15 @@ function updateAudio(gl, freqTexture, timeTexture, audio) {
     audio.instantFrequencyData.fill(0);
   }
 
-  gl.activeTexture(gl.TEXTURE1);
+  gl.activeTexture(gl.TEXTURE0+textureUnitMap['freqData']);
   gl.bindTexture(gl.TEXTURE_2D, freqTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, audio.frequencyData.length, 1, 0,
                 gl.LUMINANCE, gl.UNSIGNED_BYTE, audio.frequencyData);
   
-  gl.activeTexture(gl.TEXTURE2);
+  gl.activeTexture(gl.TEXTURE0+textureUnitMap['timeData']);
   gl.bindTexture(gl.TEXTURE_2D, timeTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, audio.timeDomainData.length, 1, 0,
                 gl.LUMINANCE, gl.UNSIGNED_BYTE, audio.timeDomainData);
-
-  gl.activeTexture(gl.TEXTURE0);
 }
 
 function clearScene(gl) {
@@ -362,77 +491,98 @@ function clearScene(gl) {
   gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
-function drawScene(gl, programInfo, buffer, pingPongData, uniforms, numTextures) {
+function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferInfo, textureUnitMap) {
 
-  function bindAndDraw(programIndex, fbo) {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  const bufferList = bufferInfo.bufferList;
+  const bufferMap = bufferInfo.bufferMap;
+  const bufferMapKeys = bufferInfo.bufferMapKeys;
+  const numBuffers = bufferInfo.numBuffers;
+  const numImages = textureUnitMap['buf'] - textureUnitMap['tex'];
+  const offset1 = (uniforms.frameCount%2) * numBuffers;
+  const offset2 = ((uniforms.frameCount+1)%2) * numBuffers;
+  const offsets = new Array(numBuffers);
+  offsets.fill(offset2);
+  let bufferCount = 0;
+  let pingPongCount = 0;
 
-    gl.uniform1i(programInfo[programIndex].uniformLocations.frame, 0);
-    for (let i = 0; i < numTextures; i++) {
-      gl.uniform1i(programInfo[programIndex].uniformLocations[`tex${i+1}`], 3+i);
-    }
-    //gl.uniform1i(programInfo[programIndex].uniformLocations.prevDraw, (uniforms.frameCount > 0) ? 3 : 0);
-    gl.uniform2f(programInfo[programIndex].uniformLocations.resolution, 
+  function setUniforms(i) {
+    gl.uniform1i(programInfo[i].uniformLocations.frame, textureUnitMap['frame']);
+    gl.uniform1i(programInfo[i].uniformLocations.firstFrame, textureUnitMap['firstFrame']);
+    gl.uniform1i(programInfo[i].uniformLocations.prevFrame, 
+                 (uniforms.frameCount > 0) ? textureUnitMap['prevFrame'] : textureUnitMap['frame']);
+    gl.uniform1i(programInfo[i].uniformLocations.thisBuf, 
+                 (uniforms.frameCount > 0 && programInfo[i].buffer !== null)
+                  ? textureUnitMap['buf']+bufferMapKeys.indexOf(programInfo[i].buffer)+offset2
+                  : textureUnitMap['frame']);
+    gl.uniform2f(programInfo[i].uniformLocations.resolution, 
                  gl.canvas.width, gl.canvas.height);
-    gl.uniform2f(programInfo[programIndex].uniformLocations.mouse, 
+    gl.uniform2f(programInfo[i].uniformLocations.mouse, 
                  uniforms.mouse.x, uniforms.mouse.y);
-    gl.uniform1i(programInfo[programIndex].uniformLocations.freqData, 1);
-    gl.uniform1i(programInfo[programIndex].uniformLocations.timeData, 2);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.bass, uniforms.bass);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.avgBass, uniforms.avgBass);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.mid, uniforms.mid);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.avgMid, uniforms.avgMid);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.treb, uniforms.treb);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.avgTreb, uniforms.avgTreb);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.energy, uniforms.energy);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.avgEnergy, uniforms.avgEnergy);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.time, uniforms.time);
-    gl.uniform1f(programInfo[programIndex].uniformLocations.deltaTime, uniforms.deltaTime);
+    gl.uniform1i(programInfo[i].uniformLocations.freqData, textureUnitMap['freqData']);
+    gl.uniform1i(programInfo[i].uniformLocations.timeData, textureUnitMap['timeData']);
+    gl.uniform1f(programInfo[i].uniformLocations.bass, uniforms.bass);
+    gl.uniform1f(programInfo[i].uniformLocations.avgBass, uniforms.avgBass);
+    gl.uniform1f(programInfo[i].uniformLocations.mid, uniforms.mid);
+    gl.uniform1f(programInfo[i].uniformLocations.avgMid, uniforms.avgMid);
+    gl.uniform1f(programInfo[i].uniformLocations.treb, uniforms.treb);
+    gl.uniform1f(programInfo[i].uniformLocations.avgTreb, uniforms.avgTreb);
+    gl.uniform1f(programInfo[i].uniformLocations.energy, uniforms.energy);
+    gl.uniform1f(programInfo[i].uniformLocations.avgEnergy, uniforms.avgEnergy);
+    gl.uniform1f(programInfo[i].uniformLocations.time, uniforms.time);
+    gl.uniform1f(programInfo[i].uniformLocations.deltaTime, uniforms.deltaTime);
+    for (let j = 0; j < numImages; j++) {
+      gl.uniform1i(programInfo[i].uniformLocations[`tex${j+1}`], textureUnitMap['tex']+j);
+    }
+    for (let j = 0; j < numBuffers; j++) {
+      //const bufStr = `buf${bufferMap[bufferMapKeys[j]]+1}`;
+      const bufStr = `buf${bufferMapKeys[j]+1}`;
+      const textureUnit = (uniforms.frameCount > 0) ? (textureUnitMap['buf']+j+offsets[j]) : textureUnitMap['frame'];
+      gl.uniform1i(programInfo[i].uniformLocations[bufStr], textureUnit);
+    }
+  }
 
+  function bindAndDraw(i, fbo) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    setUniforms(i);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  // Apply each shader by fbo ping-ponging
-  for (var i = 0; i < programInfo.length; i++) {
-    { 
-      const numComponents = 2;
-      const type = gl.FLOAT;
-      const normalize = false;
-      const stride = 0;
-      const offset = 0;
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.vertexAttribPointer(programInfo[i].attribLocations.vertexPosition,
-                             numComponents, type, normalize, stride, offset);
-      gl.enableVertexAttribArray(programInfo[i].attribLocations.vertexPosition);
-    }
 
-    // Tell WebGL to use our program when drawing
+  for (let i = 0; i < programInfo.length; i++) {
+
     gl.useProgram(programInfo[i].program);
-    // Tell WebGL we want to affect texture unit 0
-    gl.activeTexture(gl.TEXTURE0);
 
     if (i != programInfo.length-1) {
-      bindAndDraw(i, pingPongData.framebuffers[i%2]);
-      gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[i%2]);
+      if (programInfo[i].buffer !== null) {
+        bindAndDraw(i, bufferData.framebuffers[bufferCount+offset2]);
+        gl.activeTexture(gl.TEXTURE0+textureUnitMap['buf']+bufferCount+offset1);
+        gl.bindTexture(gl.TEXTURE_2D, bufferData.textures[bufferCount+offset2]);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, bufferData.textures[bufferCount+offset2]);
+        offsets[bufferCount] = offset1;
+        bufferCount++;
+      }
+      else {
+        bindAndDraw(i, pingPongData.framebuffers[pingPongCount%2]);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[pingPongCount%2]);
+        pingPongCount++;
+      }
     }
   }
-
-  bindAndDraw(programInfo.length-1, null);
-
-  /*
-  (function saveDraw() {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, pingPongData.framebuffers[uniforms.frameCount%2+2]);
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, pingPongData.textures[uniforms.frameCount%2+2]);
-    gl.activeTexture(gl.TEXTURE0);
-  })();
-  */
+  let i = programInfo.length-1;
+  bindAndDraw(i, null);
+  if (programInfo[i].buffer !== null) {
+    //gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, gl.canvas.width, gl.canvas.height, 0);
+    bindAndDraw(i, bufferData.framebuffers[bufferCount+offset2]);
+    gl.activeTexture(gl.TEXTURE0+textureUnitMap['buf']+bufferCount+offset1);
+    gl.bindTexture(gl.TEXTURE_2D, bufferData.textures[bufferCount+offset2]);
+  }
+  gl.activeTexture(gl.TEXTURE0);
 }
 
-function initPrograms(gl, numTextures) {
+function initPrograms(gl, numImages, bufferInfo) {
 
   if (fragShaders.length == 0) {
     return null;
@@ -442,39 +592,45 @@ function initPrograms(gl, numTextures) {
   // Vertex shader program
   const vsSource = parser.getSource(fragShaders[0]);
 
-  const shaderPrograms = [];
   const programInfo = [];
   for (let i = 0; i < fragShaders.length; i++) {
-    shaderPrograms.push(initShaderProgram(gl, vsSource, fragShaders[i]));
-    if (shaderPrograms[i] == null) {
+    let shaderProgram = initShaderProgram(gl, vsSource, fragShaders[i]);
+    if (shaderProgram == null) {
       return null;
     }
     programInfo.push({
-      program: shaderPrograms[i],
+      program: shaderProgram,
       attribLocations: {
-        vertexPosition: gl.getAttribLocation(shaderPrograms[i], 'aVertexPosition')
+        vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition')
       },
       uniformLocations: {
-        frame: gl.getUniformLocation(shaderPrograms[i], 'frame'),
-        //prevDraw: gl.getUniformLocation(shaderPrograms[i], 'prevDraw'),
-        resolution: gl.getUniformLocation(shaderPrograms[i], 'resolution'),
-        mouse: gl.getUniformLocation(shaderPrograms[i], 'mouse'),
-        freqData: gl.getUniformLocation(shaderPrograms[i], 'freqData'),
-        timeData: gl.getUniformLocation(shaderPrograms[i], 'timeData'),
-        bass: gl.getUniformLocation(shaderPrograms[i], 'bass'),
-        avgBass: gl.getUniformLocation(shaderPrograms[i], 'avgBass'),
-        mid: gl.getUniformLocation(shaderPrograms[i], 'mid'),
-        avgMid: gl.getUniformLocation(shaderPrograms[i], 'avgMid'),
-        treb: gl.getUniformLocation(shaderPrograms[i], 'treb'),
-        avgTreb: gl.getUniformLocation(shaderPrograms[i], 'avgTreb'),
-        energy: gl.getUniformLocation(shaderPrograms[i], 'energy'),
-        avgEnergy: gl.getUniformLocation(shaderPrograms[i], 'avgEnergy'),
-        time: gl.getUniformLocation(shaderPrograms[i], 'time'),
-        deltaTime: gl.getUniformLocation(shaderPrograms[i], 'deltaTime')
-      }
+        frame: gl.getUniformLocation(shaderProgram, 'frame'),
+        firstFrame: gl.getUniformLocation(shaderProgram, 'firstFrame'),
+        prevFrame: gl.getUniformLocation(shaderProgram, 'prevFrame'),
+        thisBuf: gl.getUniformLocation(shaderProgram, 'thisBuf'),
+        resolution: gl.getUniformLocation(shaderProgram, 'resolution'),
+        mouse: gl.getUniformLocation(shaderProgram, 'mouse'),
+        freqData: gl.getUniformLocation(shaderProgram, 'freqData'),
+        timeData: gl.getUniformLocation(shaderProgram, 'timeData'),
+        bass: gl.getUniformLocation(shaderProgram, 'bass'),
+        avgBass: gl.getUniformLocation(shaderProgram, 'avgBass'),
+        mid: gl.getUniformLocation(shaderProgram, 'mid'),
+        avgMid: gl.getUniformLocation(shaderProgram, 'avgMid'),
+        treb: gl.getUniformLocation(shaderProgram, 'treb'),
+        avgTreb: gl.getUniformLocation(shaderProgram, 'avgTreb'),
+        energy: gl.getUniformLocation(shaderProgram, 'energy'),
+        avgEnergy: gl.getUniformLocation(shaderProgram, 'avgEnergy'),
+        time: gl.getUniformLocation(shaderProgram, 'time'),
+        deltaTime: gl.getUniformLocation(shaderProgram, 'deltaTime')
+      },
+      buffer: bufferInfo.bufferList[i]
     });
-    for (let j = 0; j < numTextures; j++) {
-      programInfo[i].uniformLocations[`tex${j+1}`] = gl.getUniformLocation(shaderPrograms[i], `tex${j+1}`);
+    for (let j = 0; j < numImages; j++) {
+      programInfo[i].uniformLocations[`tex${j+1}`] = gl.getUniformLocation(shaderProgram, `tex${j+1}`);
+    }
+    for (let j = 0; j < bufferInfo.numBuffers; j++) {
+      const bufStr = `buf${bufferInfo.bufferMapKeys[j]+1}`;
+      programInfo[i].uniformLocations[bufStr] = gl.getUniformLocation(shaderProgram, bufStr);
     }
   }
 
@@ -532,8 +688,10 @@ function setDimensions(elements) {
   }
   else if (state.mediaType == 'image') {
     var mediaWidth = elements.media.width;
-    var mediaHeight = elements.media.height;  
+    var mediaHeight = elements.media.height;
   }
+  console.log(`width: ${mediaWidth}`);
+  console.log(`height: ${mediaHeight}`);
 
   if (elements.canvas.width != mediaWidth || elements.canvas.height != mediaHeight) {
     flags.resetFBO = true;
@@ -555,6 +713,12 @@ function showCanvas(elements) {
 function hideCanvas(elements) {
   if (elements.canvas) {
     elements.canvas.style.visibility = 'hidden';
+  }
+}
+
+function removeCanvas(elements) {
+  if (elements.canvas) {
+    elements.canvas.parentNode.removeChild(elements.canvas);
   }
 }
 
@@ -602,8 +766,8 @@ function initCanvas(elements) {
   elements.canvas.style.display = 'block';
   elements.canvas.style.visibility = 'hidden';
   elements.canvas.style.objectFit = 'contain';
-  setDimensions(elements);
-  reStyle(elements);
+  if (elements.media.parentNode.tagName.toLowerCase() == 'body')
+    reStyle(elements);
   elements.media.insertAdjacentElement('beforebegin', elements.canvas);
 }
 
@@ -832,6 +996,7 @@ function Recorder(canvas) {
 function AudioProcessor() {
 // Public:
   this.context = new AudioContext();
+  this.nyquist = this.context.sampleRate / 2;
   this.analyser = this.context.createAnalyser();
   this.instantAnalyser = this.context.createAnalyser();
   /*
@@ -923,7 +1088,7 @@ function AudioProcessor() {
 //Private:
   let getFreqIndex = (freq) => {
     return Math.floor(
-      (freq / (this.context.sampleRate / 2)) * (this.frequencyData.length - 1)
+      (freq / this.nyquist) * (this.frequencyData.length - 1)
     );
   };
   
@@ -937,7 +1102,7 @@ function AudioProcessor() {
 function initMediaStream(elements, audio, recorder) {
 
   if (state.audioSource == 'mic') {
-    let constraints = {
+    const constraints = {
       channelCount : {ideal: 2},
       autoGainControl: false,
       echoCancellation: false,
