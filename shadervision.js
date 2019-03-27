@@ -184,11 +184,11 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
   console.log("ShaderVision: Running...");
   const fps = null;
   const mipmapsFlag = false;
-  const maxRenders = 1;
+  const maxRenders = null;
   const textureUnitMap = {
     frame: 0,
     prevFrame: 1,
-    firstFrame: 2,
+    curFrame: 2,
     freqData: 3,
     timeData: 4,
     tex: 5,
@@ -294,8 +294,8 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
     // update prevFrame
     gl.activeTexture(gl.TEXTURE0+textureUnitMap['prevFrame']);
     gl.bindTexture(gl.TEXTURE_2D, frameTextures[(uniforms.frameCount+1)%2]);
-    // update firstFrame
-    gl.activeTexture(gl.TEXTURE0+textureUnitMap['firstFrame']);
+    // update curFrame
+    gl.activeTexture(gl.TEXTURE0+textureUnitMap['curFrame']);
     gl.bindTexture(gl.TEXTURE_2D, frameTextures[uniforms.frameCount%2]);
 
 
@@ -345,7 +345,7 @@ function initTexture(gl, minification, wrap) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
   if (!wrap) {
-    wrap = gl.REPEAT;//gl.MIRRORED_REPEAT;
+    wrap = gl.MIRRORED_REPEAT;
   }
   if (!minification) {
     minification = gl.LINEAR;
@@ -507,7 +507,7 @@ function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferIn
 
   function setUniforms(i) {
     gl.uniform1i(programInfo[i].uniformLocations.frame, textureUnitMap['frame']);
-    gl.uniform1i(programInfo[i].uniformLocations.firstFrame, textureUnitMap['firstFrame']);
+    gl.uniform1i(programInfo[i].uniformLocations.curFrame, textureUnitMap['curFrame']);
     gl.uniform1i(programInfo[i].uniformLocations.prevFrame, 
                  (uniforms.frameCount > 0) ? textureUnitMap['prevFrame'] : textureUnitMap['frame']);
     gl.uniform1i(programInfo[i].uniformLocations.thisBuf, 
@@ -605,7 +605,7 @@ function initPrograms(gl, numImages, bufferInfo) {
       },
       uniformLocations: {
         frame: gl.getUniformLocation(shaderProgram, 'frame'),
-        firstFrame: gl.getUniformLocation(shaderProgram, 'firstFrame'),
+        curFrame: gl.getUniformLocation(shaderProgram, 'curFrame'),
         prevFrame: gl.getUniformLocation(shaderProgram, 'prevFrame'),
         thisBuf: gl.getUniformLocation(shaderProgram, 'thisBuf'),
         resolution: gl.getUniformLocation(shaderProgram, 'resolution'),
