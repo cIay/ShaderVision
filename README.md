@@ -34,9 +34,9 @@ uniform vec2 resolution;     // intrinsic width and height of the WebGL canvas i
 uniform sampler2D curFrame;  // captured video/image frame of the current render cycle
 uniform sampler2D prevFrame; // captured video/image frame of the previous render cycle
 uniform sampler2D frame;     // output frame of the preceding shader program, or curFrame if this program is first
-uniform sampler2D bufN;      // output frame of the shader program set to buffer N (from 1 to 3)
+uniform sampler2D buf{i};    // output frame of the shader program set to buffer i (from 1 to 3)
 uniform sampler2D thisBuf;   // output of this program in the previous render cycle as long as it has a buffer number set
-uniform sampler2D texN;      // input image texture where N is the slot number (from 1 to 6)
+uniform sampler2D tex{i};    // input image texture where i is the slot number (from 1 to 6)
 uniform float time;          // time since the program began running in seconds
 uniform float timeDelta;     // time since the last draw in seconds
 uniform float drawCount;     // number of draws since the program began running
