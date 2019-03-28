@@ -83,6 +83,7 @@ body {
 }
 
 #exec {
+  width: 64px;
   padding: 2px 8px 2px 8px;
   box-shadow: 0px 2px 3px 1px hsla(262, 90%, 10%, 70%);
   border-radius: 3px;

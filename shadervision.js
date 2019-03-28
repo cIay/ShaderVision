@@ -227,8 +227,8 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
     energy: 0,
     avgEnergy: 0,
     time: 0,
-    deltaTime: 0,
-    frameCount: 0
+    timeDelta: 0,
+    drawCount: 0
   };
   initMouseListener(elements, uniforms.mouse);
 
@@ -250,10 +250,10 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
   function render() {
     uniforms.time = performance.now();
     uniforms.time *= 0.001;  // convert to seconds
-    uniforms.deltaTime = uniforms.time - prevTime;
+    uniforms.timeDelta = uniforms.time - prevTime;
     prevTime = uniforms.time;
 
-    if (maxRenders && maxRenders <= uniforms.frameCount) {
+    if (maxRenders && maxRenders <= uniforms.drawCount) {
       endProgram();
       return;
     }
@@ -285,7 +285,7 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
 
     updateAudio(gl, freqTexture, timeTexture, audio, textureUnitMap, uniforms);
 
-    if (!updateTexture(gl, frameTextures[uniforms.frameCount%2], elements.media, mipmapsFlag)) {
+    if (!updateTexture(gl, frameTextures[uniforms.drawCount%2], elements.media, mipmapsFlag)) {
       //if (elements.media.currentSrc)
         //chrome.runtime.sendMessage({tabUrl: elements.media.currentSrc});
       endProgram({showMedia: true, removeCanvas: true});
@@ -293,10 +293,10 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
     }
     // update prevFrame
     gl.activeTexture(gl.TEXTURE0+textureUnitMap['prevFrame']);
-    gl.bindTexture(gl.TEXTURE_2D, frameTextures[(uniforms.frameCount+1)%2]);
+    gl.bindTexture(gl.TEXTURE_2D, frameTextures[(uniforms.drawCount+1)%2]);
     // update curFrame
     gl.activeTexture(gl.TEXTURE0+textureUnitMap['curFrame']);
-    gl.bindTexture(gl.TEXTURE_2D, frameTextures[uniforms.frameCount%2]);
+    gl.bindTexture(gl.TEXTURE_2D, frameTextures[uniforms.drawCount%2]);
 
 
     drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferInfo, textureUnitMap);
@@ -307,7 +307,7 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
       flags.takeScreenshot = false;
     }
     
-    uniforms.frameCount++;
+    uniforms.drawCount++;
 
     if (fps)
       setTimeout(render, 1000/fps);
@@ -379,19 +379,14 @@ function initImageTextures(gl, images, textureUnitMap, mipmapsFlag) {
 }
 
 function initBufferInfo(bufferList) {
-  //const bufferList = new Array(fragShaders.length);
-  //bufferList.fill(null);
-  //bufferList[0] = 0; bufferList[1] = 1; bufferList[2] = 2; 
   const bufferMap = new Map();
   const bufferMapKeys = [];
   for (let i = 0; i < bufferList.length; i++) {
     if (bufferList[i] !== null) {
-      //bufferMap[bufferList[i]] = i;
       bufferMap.set(bufferList[i], i);
       bufferMapKeys.push(bufferList[i]);
     }
   }
-  //const bufferMapKeys = Object.keys(bufferMap);
   const numBuffers = bufferMapKeys.length;
   return {
     bufferList: bufferList,
@@ -498,8 +493,8 @@ function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferIn
   const bufferMapKeys = bufferInfo.bufferMapKeys;
   const numBuffers = bufferInfo.numBuffers;
   const numImages = textureUnitMap['buf'] - textureUnitMap['tex'];
-  const offset1 = (uniforms.frameCount%2) * numBuffers;
-  const offset2 = ((uniforms.frameCount+1)%2) * numBuffers;
+  const offset1 = (uniforms.drawCount%2) * numBuffers;
+  const offset2 = ((uniforms.drawCount+1)%2) * numBuffers;
   const offsets = new Array(numBuffers);
   offsets.fill(offset2);
   let bufferCount = 0;
@@ -509,9 +504,9 @@ function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferIn
     gl.uniform1i(programInfo[i].uniformLocations.frame, textureUnitMap['frame']);
     gl.uniform1i(programInfo[i].uniformLocations.curFrame, textureUnitMap['curFrame']);
     gl.uniform1i(programInfo[i].uniformLocations.prevFrame, 
-                 (uniforms.frameCount > 0) ? textureUnitMap['prevFrame'] : textureUnitMap['frame']);
+                 (uniforms.drawCount > 0) ? textureUnitMap['prevFrame'] : textureUnitMap['frame']);
     gl.uniform1i(programInfo[i].uniformLocations.thisBuf, 
-                 (uniforms.frameCount > 0 && programInfo[i].buffer !== null)
+                 (uniforms.drawCount > 0 && programInfo[i].buffer !== null)
                   ? textureUnitMap['buf']+bufferMapKeys.indexOf(programInfo[i].buffer)+offset2
                   : textureUnitMap['frame']);
     gl.uniform2f(programInfo[i].uniformLocations.resolution, 
@@ -529,14 +524,15 @@ function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferIn
     gl.uniform1f(programInfo[i].uniformLocations.energy, uniforms.energy);
     gl.uniform1f(programInfo[i].uniformLocations.avgEnergy, uniforms.avgEnergy);
     gl.uniform1f(programInfo[i].uniformLocations.time, uniforms.time);
-    gl.uniform1f(programInfo[i].uniformLocations.deltaTime, uniforms.deltaTime);
+    gl.uniform1f(programInfo[i].uniformLocations.timeDelta, uniforms.timeDelta);
+    gl.uniform1f(programInfo[i].uniformLocations.drawCount, uniforms.drawCount);
     for (let j = 0; j < numImages; j++) {
       gl.uniform1i(programInfo[i].uniformLocations[`tex${j+1}`], textureUnitMap['tex']+j);
     }
     for (let j = 0; j < numBuffers; j++) {
       //const bufStr = `buf${bufferMap[bufferMapKeys[j]]+1}`;
       const bufStr = `buf${bufferMapKeys[j]+1}`;
-      const textureUnit = (uniforms.frameCount > 0) ? (textureUnitMap['buf']+j+offsets[j]) : textureUnitMap['frame'];
+      const textureUnit = (uniforms.drawCount > 0) ? (textureUnitMap['buf']+j+offsets[j]) : textureUnitMap['frame'];
       gl.uniform1i(programInfo[i].uniformLocations[bufStr], textureUnit);
     }
   }
@@ -621,7 +617,8 @@ function initPrograms(gl, numImages, bufferInfo) {
         energy: gl.getUniformLocation(shaderProgram, 'energy'),
         avgEnergy: gl.getUniformLocation(shaderProgram, 'avgEnergy'),
         time: gl.getUniformLocation(shaderProgram, 'time'),
-        deltaTime: gl.getUniformLocation(shaderProgram, 'deltaTime')
+        timeDelta: gl.getUniformLocation(shaderProgram, 'timeDelta'),
+        drawCount: gl.getUniformLocation(shaderProgram, 'drawCount')
       },
       buffer: bufferInfo.bufferList[i]
     });
@@ -651,7 +648,7 @@ function initShaderProgram(gl, vsSource, fsSource) {
   gl.linkProgram(shaderProgram);
 
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    alert('ShaderVision: Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+    alert("ShaderVision: Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
     return null;
   }
 
@@ -666,7 +663,7 @@ function loadShader(gl, type, source) {
   gl.compileShader(shader);
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    alert('ShaderVision: An error occurred compiling the shader: ' + gl.getShaderInfoLog(shader));
+    alert("ShaderVision: An error occurred compiling the shader: " + gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }

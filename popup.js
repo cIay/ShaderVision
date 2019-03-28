@@ -575,7 +575,6 @@ function updateAnimation(item) {
 
 (function retrieveActiveShaders() {
   chrome.storage.local.get(['activeShaders'], function(result) {
-    console.log(result);
     if (!result.activeShaders) {
       chrome.storage.local.set({activeShaders: []});
       return;
