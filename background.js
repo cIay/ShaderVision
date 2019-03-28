@@ -59,6 +59,9 @@ chrome.contextMenus.onClicked.addListener(function(info, tab) {
 
 function fetchDataURL(url, callback) {
   const xhr = new XMLHttpRequest();
+  xhr.addEventListener('error', function(err) {
+    alert("Error fetching image: " + url);
+  });
   xhr.addEventListener('load', function() {
     const fileReader = new FileReader();
     fileReader.addEventListener('loadend', function(e) {
