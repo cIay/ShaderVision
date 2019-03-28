@@ -60,7 +60,7 @@ uniform float avgEnergy;     // average total energy in the last second
 
 ![screen3](https://github.com/cIay/cIay.github.io/blob/master/images/ShaderVision/monaco_glitched.png)
 
-![screen4](https://github.com/cIay/cIay.github.io/blob/master/images/ShaderVision/monaco_noise.png)
+![screen4](https://github.com/cIay/cIay.github.io/blob/master/images/ShaderVision/monaco_noise.PNG)
 
 ## Random Tips & Info
 - You should use the 'frame' uniform over 'curFrame' where possible so you can chain your shaders together for some interesting results.
