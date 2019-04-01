@@ -146,15 +146,13 @@ function main() {
       return;
     }
 
-    console.log(request);
+    //console.log(request);
 
     applySettings(request.settings, audio, recorder);
     initMediaStream(elements, audio, recorder);
 
     const bufferInfo = initBufferInfo(request.shaders.bufNums);
   
-    console.log(bufferInfo);
-
     if (fragShaders === null) {
       showCanvas(elements);
       hideMedia(elements);
@@ -245,10 +243,11 @@ function execShaders(gl, settings, images, bufferInfo, elements, audio, recorder
 
   initImageTextures(gl, images, textureUnitMap, mipmapsFlag);
   
+  const initialTime = performance.now();
   let prevTime = 0.0;
   // Draw the scene repeatedly
   function render() {
-    uniforms.time = performance.now();
+    uniforms.time = performance.now() - initialTime;
     uniforms.time *= 0.001;  // convert to seconds
     uniforms.timeDelta = uniforms.time - prevTime;
     prevTime = uniforms.time;
@@ -687,8 +686,8 @@ function setDimensions(elements) {
     var mediaWidth = elements.media.width;
     var mediaHeight = elements.media.height;
   }
-  console.log(`width: ${mediaWidth}`);
-  console.log(`height: ${mediaHeight}`);
+  //console.log(`width: ${mediaWidth}`);
+  //console.log(`height: ${mediaHeight}`);
 
   if (elements.canvas.width != mediaWidth || elements.canvas.height != mediaHeight) {
     flags.resetFBO = true;

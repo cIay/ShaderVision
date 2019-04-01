@@ -89,6 +89,9 @@ function saveAnimation(items) {
 
 document.getElementById("options-form").addEventListener('submit', function(e) {
   e.preventDefault();
+  if (document.getElementById("options-page").style.display != 'block') {
+    return;
+  }
   chrome.storage.local.set({settings: {
     audioSource: audioSourceElement.value,
     fftSize: parseInt(fftSizeElement.value),

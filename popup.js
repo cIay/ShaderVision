@@ -72,18 +72,19 @@ function SelectionHandler() {
     }
 
     this.find = (character) => {
-      if (searchBar == document.activeElement || overlayPageOpen()) {
+      if (searchBar == document.activeElement || 
+          overlayPageOpen() || 
+          prevSelected.status == 'active') {
         return;
       }
-      if (prevSelected.status != 'active') {
-        for (let i = 0; i < savedShaders.length; i++) {
-          if (savedShaders[i].style.display != 'none') {
-            const firstLetter = savedShaders[i].firstChild.innerText[0].toLowerCase();
-            if (firstLetter >= character) {
-              savedShaders[i].scrollIntoView({block: 'nearest'});
-              handler.highlight(savedShaders[i]);
-              return;
-            }
+
+      for (let i = 0; i < savedShaders.length; i++) {
+        if (savedShaders[i].style.display != 'none') {
+          const firstLetter = savedShaders[i].firstChild.innerText[0].toLowerCase();
+          if (firstLetter >= character) {
+            savedShaders[i].scrollIntoView({block: 'nearest'});
+            handler.highlight(savedShaders[i]);
+            return;
           }
         }
       }
