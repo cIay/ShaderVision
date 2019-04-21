@@ -642,11 +642,11 @@ $("#active-shaders").sortable({
   stop: function(e, ui) {
     $(ui.item).removeAttr("style");
     if ($(ui.item).hasClass("ui-draggable-handle")) {
-      $(ui.item).removeClass("ui-draggable-handle");      
+      $(ui.item).removeClass("ui-draggable-handle");
       $(ui.item).addClass("ui-sortable-handle");
       appendActiveButtons(ui.item.context);
       $(ui.item).mousedown(function() {
-        selectionHandler.highlight(ui.item.context, "active-shaders");
+        selectionHandler.highlight(ui.item.context, "active");
       });
     }
     chrome.storage.local.set({activeShaders: createShaderList()});
