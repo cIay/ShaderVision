@@ -39,7 +39,7 @@ uniform sampler2D thisBuf;   // output of this program in the previous render cy
 uniform sampler2D tex{i};    // input image texture where i is the slot number (from 1 to 6)
 uniform float time;          // time since the program began running in seconds
 uniform float timeDelta;     // time since the last draw in seconds
-uniform float drawCount;     // number of draws since the program began running
+uniform int drawCount;       // number of draws to screen since the program began running
 uniform vec2 mouse;          // mouse location coordinates
 uniform sampler2D timeData;  // audio time domain samples
 uniform sampler2D freqData;  // audio frequency domain dB values
@@ -63,7 +63,7 @@ uniform float avgEnergy;     // average total energy in the last second
 ![screen4](https://github.com/cIay/cIay.github.io/blob/master/images/ShaderVision/monaco_noise.PNG)
 
 ## Random Tips & Info
-- You should use the 'frame' uniform over 'curFrame' where possible so you can chain your shaders together for some interesting results.
+- You should use the 'frame' uniform over 'curFrame' when possible so you can chain your shaders together for some interesting results.
 - Files can be added in three different ways: 
   1. By opening the editor (via the 'New file' or 'Edit' buttons) and saving with Ctrl-S 
   2. By saving your file directly to the 'glsl' directory in your ShaderVision folder
