@@ -7,6 +7,8 @@ uniform vec2 resolution;
 uniform sampler2D frame;
 uniform float time;
 
+// [McEwan et al. 12] Ian McEwan, David Sheets, Stefan Gustavson, and Mark Richardson. 
+// “Efficient computational noise in GLSL.” Journal of Graphics, GPU and Game Tools 16:1 (2012)
 vec3 permute(vec3 x) {
   return mod(((x * 34.0) + 1.0) * x, 289.0); 
 }
@@ -15,7 +17,7 @@ vec3 taylorInvSqrt(vec3 r) {
 }
 float snoise(vec2 P) {
   vec2 C = vec2 (0.211324865405187134,  // (3.0 - sqrt(3.0)) / 6.0
-                   0.366025403784438597); // 0.5 * (sqrt(3.0) - 1.0)
+                 0.366025403784438597); // 0.5 * (sqrt(3.0) - 1.0)
   // First corner
   vec2 i = floor (P + dot(P, C.yy));
   vec2 x0 = P - i + dot (i, C.xx);
@@ -48,6 +50,7 @@ float snoise(vec2 P) {
   return 130.0 * dot(m, g);
 }
 
+// https://thebookofshaders.com/13/
 float fbm(vec2 st) {
   float val = 0.0;
   float freq = 1.0;
@@ -61,9 +64,10 @@ float fbm(vec2 st) {
   return val;
 }
 
-vec3 pattern(vec2 p, float t, float luminance) {
-  vec2 q = vec2(fbm(p + vec2(0.0, 0.0)), fbm(p*sin(t + luminance)  + vec2(5.2, 1.3)));
-  vec2 r = vec2(fbm(p + 4.0*q + vec2(1.7,9.2)), fbm(p + 4.0*q*cos(t + luminance) + vec2(8.3,2.8)));
+// http://www.iquilezles.org/www/articles/warp/warp.htm
+vec3 pattern(vec2 p, float t, float lum) {
+  vec2 q = vec2(fbm(p + vec2(0.0, 0.0)), fbm(p*sin(t + lum)  + vec2(5.2, 1.3)));
+  vec2 r = vec2(fbm(p + 4.0*q + vec2(1.7,9.2)), fbm(p + 4.0*q*cos(t + lum) + vec2(8.3,2.8)));
   float f = fbm(p + 4.0*r);
   vec3 p_out = vec3((r.x*r.y), (mix(q.y,r.y,f)), r.y);
   return p_out;
