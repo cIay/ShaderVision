@@ -66,6 +66,10 @@ function main() {
     state.mediaType = 'image';
     elements.media = elements.image;
   }
+  else {
+    return;
+  }
+
 
 
   function testOrigin(media) {
@@ -524,7 +528,7 @@ function drawScene(gl, programInfo, uniforms, pingPongData, bufferData, bufferIn
     gl.uniform1f(programInfo[i].uniformLocations.avgEnergy, uniforms.avgEnergy);
     gl.uniform1f(programInfo[i].uniformLocations.time, uniforms.time);
     gl.uniform1f(programInfo[i].uniformLocations.timeDelta, uniforms.timeDelta);
-    gl.uniform1f(programInfo[i].uniformLocations.drawCount, uniforms.drawCount);
+    gl.uniform1i(programInfo[i].uniformLocations.drawCount, uniforms.drawCount);
     for (let j = 0; j < numImages; j++) {
       gl.uniform1i(programInfo[i].uniformLocations[`tex${j+1}`], textureUnitMap['tex']+j);
     }
